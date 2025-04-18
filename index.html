@@ -1,217 +1,280 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Flappy Đom Đóm</title>
+  <meta charset="UTF-8">
+  <title>Flappy Firefly</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      height: 100%;
+      margin: 0;
       overflow: hidden;
-      background: linear-gradient(to bottom, #000428, #004e92);
+      background: radial-gradient(circle at 50% 30%, #001a33, #000000);
       font-family: sans-serif;
+      color: #fff;
     }
-    #game {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: transparent;
     }
-
-    #firefly {
-      position: absolute;
-      width: 30px;
-      height: 30px;
-      top: 40%;
-      left: 50px;
-      border-radius: 50%;
-      background: yellow;
-      box-shadow: 0 0 10px 4px rgba(255,255,100,0.9);
-      transition: top 0.1s;
-    }
-
-    #firefly.flap::before, #firefly.flap::after {
-      animation: flapWing 0.2s ease;
-    }
-
-    #firefly::before, #firefly::after {
-      content: '';
-      position: absolute;
-      width: 15px;
-      height: 15px;
-      background: rgba(200, 200, 255, 0.6);
-      border-radius: 50%;
-      top: 2px;
-    }
-
-    #firefly::before { left: -10px; transform: rotate(-20deg); }
-    #firefly::after { right: -10px; transform: rotate(20deg); }
-
-    @keyframes flapWing {
-      0% { transform: scale(1) rotate(20deg); }
-      50% { transform: scale(0.8) rotate(0deg); }
-      100% { transform: scale(1) rotate(20deg); }
-    }
-
-    .pipe {
-      position: absolute;
-      width: 60px;
-      background: linear-gradient(to bottom, green, darkgreen);
-    }
-
-    #score {
+    #scoreboard {
       position: absolute;
       top: 10px;
-      width: 100%;
-      text-align: center;
-      font-size: 32px;
-      color: white;
-      font-weight: bold;
-      text-shadow: 1px 1px 2px black;
-    }
-
-    #startBtn, #restartBtn {
-      position: absolute;
-      top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 14px 24px;
+      transform: translateX(-50%);
       font-size: 20px;
-      background: orange;
+    }
+    #startBtn, #restartBtn, #rankingBtn {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      padding: 10px 20px;
+      background: #222;
       color: white;
       border: none;
-      border-radius: 10px;
-      display: none;
       cursor: pointer;
+    }
+    #startBtn { top: 50%; }
+    #restartBtn { top: 60%; display: none; }
+    #rankingBtn {
+      top: 10px;
+      right: 10px;
+      left: auto;
+      font-size: 12px;
+      padding: 4px 8px;
+    }
+    #rankingBoard {
+      position: absolute;
+      right: 10px;
+      top: 40px;
+      background: rgba(0,0,0,0.8);
+      padding: 8px;
+      font-size: 12px;
+      display: none;
     }
   </style>
 </head>
 <body>
-  <div id="game">
-    <div id="score">Điểm: 0</div>
-    <div id="firefly"></div>
-    <button id="startBtn">Bắt đầu</button>
-    <button id="restartBtn">Chơi lại</button>
-    <audio id="bgMusic" loop>
-      <source src="thienlyba.mp3" type="audio/mpeg" />
-    </audio>
-  </div>
+<canvas id="gameCanvas" width="480" height="640"></canvas>
+<div id="scoreboard"></div>
+<button id="startBtn">Bắt đầu</button>
+<button id="restartBtn">Chơi lại</button>
+<button id="rankingBtn">BXH</button>
+<div id="rankingBoard">Đang tải BXH...</div>
 
-  <script>
-    const game = document.getElementById("game");
-    const firefly = document.getElementById("firefly");
-    const scoreEl = document.getElementById("score");
-    const startBtn = document.getElementById("startBtn");
-    const restartBtn = document.getElementById("restartBtn");
-    const bgMusic = document.getElementById("bgMusic");
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyC5JeYI5DKcmF3ZTIOiTH23dmDzfA_NVDs",
+  authDomain: "flappy-firefly-bxh.firebaseapp.com",
+  databaseURL: "https://flappy-firefly-bxh-default-rtdb.firebaseio.com",
+  projectId: "flappy-firefly-bxh",
+  storageBucket: "flappy-firefly-bxh.appspot.com",
+  messagingSenderId: "469933896947",
+  appId: "1:469933896947:web:46fdb11940b8b1a2f9cf65"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+</script>
 
-    let fireflyY = game.clientHeight / 2;
-    let velocity = 0;
-    let gravity = 0.2;
-    let jump = -5;
-    let isPlaying = false;
-    let pipes = [];
-    let score = 0;
-    let gameInterval, pipeInterval;
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-    function resetGame() {
-      pipes.forEach(p => p.remove());
-      pipes = [];
-      fireflyY = game.clientHeight / 2;
-      velocity = 0;
-      firefly.style.top = fireflyY + "px";
-      score = 0;
-      scoreEl.textContent = "Điểm: 0";
+let firefly, pipes, birds, score, isGameOver, gameSpeed;
+let playerName = prompt("Tên bạn:") || "Ẩn danh";
+let started = false, lastPipeTime = 0, lastBirdTime = 0;
+
+function resetGame() {
+  firefly = { x: 80, y: 200, vy: 0, size: 30 };
+  pipes = []; birds = [];
+  score = 0; isGameOver = false;
+  gameSpeed = 2;
+  lastPipeTime = Date.now();
+  lastBirdTime = Date.now();
+}
+
+function drawFirefly() {
+  const time = Date.now() / 200;
+  const glow = Math.sin(time * 3) * 10 + 30;
+  const gradient = ctx.createRadialGradient(firefly.x, firefly.y, 0, firefly.x, firefly.y, glow);
+  gradient.addColorStop(0, "rgba(255,255,150,0.8)");
+  gradient.addColorStop(1, "rgba(255,255,150,0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(firefly.x, firefly.y, glow, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(firefly.x, firefly.y);
+  const wingAngle = Math.sin(time * 10) * 0.5;
+  ctx.rotate(wingAngle);
+  ctx.fillStyle = "rgba(200,200,255,0.6)";
+  ctx.beginPath();
+  ctx.ellipse(0, -15, 8, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.rotate(-2 * wingAngle);
+  ctx.beginPath();
+  ctx.ellipse(0, -15, 8, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = "#FFD700";
+  ctx.beginPath();
+  ctx.arc(firefly.x, firefly.y, firefly.size / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.arc(firefly.x - 10, firefly.y, 6, 0, Math.PI * 2);
+  ctx.arc(firefly.x + 10, firefly.y, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.arc(firefly.x - 10, firefly.y, 2, 0, Math.PI * 2);
+  ctx.arc(firefly.x + 10, firefly.y, 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPipes() {
+  pipes.forEach(p => {
+    const radius = 15;
+    ctx.fillStyle = "#44FF99";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(p.x, 0);
+    ctx.lineTo(p.x + p.width, 0);
+    ctx.lineTo(p.x + p.width, p.top);
+    ctx.lineTo(p.x, p.top);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#228855";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(p.x, canvas.height);
+    ctx.lineTo(p.x + p.width, canvas.height);
+    ctx.lineTo(p.x + p.width, canvas.height - p.bottom);
+    ctx.lineTo(p.x, canvas.height - p.bottom);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  });
+}
+
+function drawBirds() {
+  birds.forEach(b => {
+    ctx.fillStyle = "#FF4444";
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 10, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function update() {
+  if (!started || isGameOver) return;
+  firefly.vy += 0.4;
+  firefly.y += firefly.vy;
+  pipes.forEach(p => p.x -= gameSpeed);
+  birds.forEach(b => b.x -= gameSpeed + 1);
+
+  if (Date.now() - lastPipeTime > 1500) {
+    let gap = 120;
+    let top = Math.random() * (canvas.height - gap - 100) + 20;
+    pipes.push({ x: canvas.width, width: 50, top: top, bottom: canvas.height - top - gap });
+    lastPipeTime = Date.now();
+  }
+
+  if (score >= 40 && Date.now() - lastBirdTime > 3000) {
+    birds.push({ x: canvas.width, y: Math.random() * canvas.height });
+    lastBirdTime = Date.now();
+  }
+
+  pipes = pipes.filter(p => p.x + p.width > 0);
+  birds = birds.filter(b => b.x > -20);
+
+  pipes.forEach(p => {
+    if (firefly.x + firefly.size/2 > p.x &&
+        firefly.x - firefly.size/2 < p.x + p.width &&
+        (firefly.y - firefly.size/2 < p.top || firefly.y + firefly.size/2 > canvas.height - p.bottom)) {
+      gameOver();
+    } else if (p.x + p.width === firefly.x) {
+      score++;
+      if (score % 5 === 0) gameSpeed += 0.2;
     }
+  });
 
-    function startGame() {
-      resetGame();
-      isPlaying = true;
-      startBtn.style.display = "none";
-      restartBtn.style.display = "none";
-      bgMusic.play();
+  birds.forEach(b => {
+    if (Math.hypot(b.x - firefly.x, b.y - firefly.y) < firefly.size/2 + 10) gameOver();
+  });
 
-      gameInterval = setInterval(() => {
-        velocity += gravity;
-        fireflyY += velocity;
-        firefly.style.top = fireflyY + "px";
+  if (firefly.y > canvas.height || firefly.y < 0) gameOver();
+}
 
-        if (fireflyY > game.clientHeight - 30 || fireflyY < 0) endGame();
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawPipes();
+  drawBirds();
+  drawFirefly();
+  document.getElementById("scoreboard").innerText = `Điểm: ${score}`;
+}
 
-        pipes.forEach(pipe => {
-          pipe.style.left = (parseInt(pipe.style.left) - 3) + "px"; // tốc độ nhanh hơn
+function loop() {
+  update();
+  render();
+  requestAnimationFrame(loop);
+}
 
-          const pipeLeft = parseInt(pipe.style.left);
-          const pipeTop = parseInt(pipe.style.top);
-          const pipeHeight = parseInt(pipe.style.height);
-          const fireflyTop = fireflyY;
-          const fireflyBottom = fireflyY + 30;
+function gameOver() {
+  isGameOver = true;
+  document.getElementById("restartBtn").style.display = "block";
+  saveScore();
+}
 
-          if (
-            pipeLeft < 90 && pipeLeft + 60 > 50 &&
-            (
-              (pipe.classList.contains("top") && fireflyTop < pipeHeight) ||
-              (!pipe.classList.contains("top") && fireflyBottom > pipeTop)
-            )
-          ) {
-            endGame();
-          }
+function jump() {
+  if (!started || isGameOver) return;
+  firefly.vy = -6;
+}
 
-          if (pipeLeft === 48 && pipe.classList.contains("top")) {
-            score++;
-            scoreEl.textContent = "Điểm: " + score;
-          }
-        });
+document.addEventListener("keydown", e => { if (e.code === "Space") jump(); });
+canvas.addEventListener("click", jump);
 
-        pipes = pipes.filter(pipe => parseInt(pipe.style.left) > -60);
-      }, 20);
+document.getElementById("startBtn").onclick = () => {
+  started = true;
+  document.getElementById("startBtn").style.display = "none";
+  resetGame();
+};
 
-      pipeInterval = setInterval(() => {
-        const gap = 140;
-        const topHeight = Math.floor(Math.random() * 250) + 50;
-        const bottomTop = topHeight + gap;
+document.getElementById("restartBtn").onclick = () => {
+  resetGame();
+  document.getElementById("restartBtn").style.display = "none";
+};
 
-        const topPipe = document.createElement("div");
-        topPipe.classList.add("pipe", "top");
-        topPipe.style.height = topHeight + "px";
-        topPipe.style.top = "0px";
-        topPipe.style.left = game.clientWidth + "px";
+document.getElementById("rankingBtn").onclick = () => {
+  const box = document.getElementById("rankingBoard");
+  box.style.display = box.style.display === "none" ? "block" : "none";
+  if (box.style.display === "block") loadRanking();
+};
 
-        const bottomPipe = document.createElement("div");
-        bottomPipe.classList.add("pipe", "bottom");
-        bottomPipe.style.height = (game.clientHeight - bottomTop) + "px";
-        bottomPipe.style.top = bottomTop + "px";
-        bottomPipe.style.left = game.clientWidth + "px";
+function saveScore() {
+  db.ref("ranking").push({ name: playerName, score: score, time: new Date().toLocaleTimeString() });
+}
 
-        game.appendChild(topPipe);
-        game.appendChild(bottomPipe);
-        pipes.push(topPipe, bottomPipe);
-      }, 1800);
-    }
+function loadRanking() {
+  const box = document.getElementById("rankingBoard");
+  db.ref("ranking").orderByChild("score").limitToLast(5).once("value", snap => {
+    let arr = [];
+    snap.forEach(child => arr.push(child.val()));
+    arr = arr.reverse();
+    box.innerHTML = "BXH Online:<br>" + arr.map((e, i) => `${i+1}. ${e.name}: ${e.score} (${e.time})`).join("<br>");
+  });
+}
 
-    function endGame() {
-      clearInterval(gameInterval);
-      clearInterval(pipeInterval);
-      isPlaying = false;
-      restartBtn.style.display = "block";
-      bgMusic.pause();
-      bgMusic.currentTime = 0;
-    }
-
-    function flap() {
-      if (!isPlaying) return;
-      velocity = jump;
-      firefly.classList.add("flap");
-      setTimeout(() => firefly.classList.remove("flap"), 200);
-    }
-
-    window.addEventListener("touchstart", flap);
-    window.addEventListener("mousedown", flap);
-
-    startBtn.onclick = startGame;
-    restartBtn.onclick = startGame;
-
-    startBtn.style.display = "block";
-  </script>
+resetGame();
+loop();
+</script>
 </body>
 </html>
