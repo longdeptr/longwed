@@ -2,124 +2,154 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hello mấy cưng hôm nay chuỵ sẽ nói về tác Hại Của Việc Chơi Game Quá Nhiều điển hình là em học sinh Phan Toàn Thắng</title>
+  <title>Caro vs AI</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      line-height: 1.6;
+      font-family: sans-serif;
+      text-align: center;
       margin: 0;
-      padding: 0;
-      background: #f3f7fa;
-      color: #333;
+      background: #eee;
     }
-    header {
-      background: #2c3e50;
-      color: white;
-      padding: 20px;
+    h1 { margin: 20px 0 10px; }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(20, 30px);
+      grid-template-rows: repeat(20, 30px);
+      gap: 1px;
+      margin: 20px auto;
+      width: fit-content;
+      background: #444;
+    }
+    .cell {
+      width: 30px;
+      height: 30px;
+      background: #fff;
+      font-size: 20px;
+      line-height: 30px;
       text-align: center;
+      cursor: pointer;
     }
-    section {
-      max-width: 800px;
-      margin: 30px auto;
-      padding: 20px;
-      background: white;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-    h2 {
-      color: #2980b9;
-    }
-    ul {
-      padding-left: 20px;
-    }
-    li {
-      margin-bottom: 10px;
-    }
-    .link {
-      margin-top: 30px;
+    #status {
       font-size: 18px;
-      font-weight: bold;
-      background: #fff3cd;
-      padding: 15px;
-      border-left: 6px solid #f0ad4e;
-      border-radius: 6px;
-      color: #8a6d3b;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      margin-top: 10px;
     }
-    .link a {
-      color: #d35400;
-      text-decoration: none;
-    }
-    .link a:hover {
-      text-decoration: underline;
-    }
-    .arrow {
-      font-size: 22px;
-      animation: bounce 1s infinite;
-    }
-    @keyframes bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-5px); }
-    }
-    footer {
-      text-align: center;
-      padding: 20px;
-      color: #888;
+    button {
+      margin-top: 10px;
+      padding: 8px 16px;
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>Tác Hại Của Việc Chơi Game Quá Nhiều</h1>
-  </header>
+<h1>Caro - Bạn vs AI</h1>
+<div id="board"></div>
+<div id="status">Lượt của bạn (X)</div>
+<button onclick="resetGame()">Chơi lại</button>
 
-  <section>
-    <p>Chơi game là một hình thức giải trí phổ biến và có thể mang lại nhiều lợi ích như tăng khả năng phản xạ, tư duy logic, hoặc giao lưu bạn bè. Tuy nhiên, nếu chơi quá nhiều và không kiểm soát, nó có thể gây ra nhiều hậu quả nghiêm trọng đến sức khỏe và cuộc sống.</p>
+<script>
+  const size = 20;
+  const board = document.getElementById("board");
+  const status = document.getElementById("status");
+  let cells = [], player = 'X', ai = 'O', gameOver = false;
 
-    <h2>1. Ảnh hưởng đến sức khỏe thể chất</h2>
-    <ul>
-      <li>Mỏi mắt, đau đầu, nhức vai gáy do ngồi lâu trước màn hình.</li>
-      <li>Giảm vận động khiến cơ thể yếu ớt, dễ béo phì và bệnh lý.</li>
-      <li>Thiếu ngủ, mất ngủ vì thức khuya chơi game.</li>
-    </ul>
+  function createBoard() {
+    board.innerHTML = '';
+    cells = Array.from({ length: size }, () => Array(size).fill(''));
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.dataset.row = r;
+        cell.dataset.col = c;
+        cell.addEventListener("click", handleClick);
+        board.appendChild(cell);
+      }
+    }
+  }
 
-    <h2>2. Ảnh hưởng đến sức khỏe tinh thần</h2>
-    <ul>
-      <li>Dễ cáu gắt, mất kiên nhẫn nếu bị gián đoạn khi chơi.</li>
-      <li>Gây nghiện, dẫn đến lo âu, trầm cảm khi không được chơi.</li>
-      <li>Gây cảm giác cô lập và ít giao tiếp với người thật.</li>
-    </ul>
+  function handleClick(e) {
+    if (gameOver) return;
+    const r = +e.target.dataset.row;
+    const c = +e.target.dataset.col;
+    if (cells[r][c]) return;
+    move(r, c, player);
+    if (checkWin(r, c, player)) return endGame("Bạn thắng!");
+    setTimeout(aiMove, 100);
+  }
 
-    <h2>3. Ảnh hưởng đến học tập và công việc</h2>
-    <ul>
-      <li>Không còn thời gian học hành, làm việc hiệu quả.</li>
-      <li>Mất tập trung, giảm khả năng ghi nhớ và tư duy.</li>
-      <li>Bỏ bê nhiệm vụ, dẫn đến kết quả học tập kém.</li>
-    </ul>
+  function move(r, c, char) {
+    cells[r][c] = char;
+    const cell = document.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
+    cell.textContent = char;
+  }
 
-    <h2>4. Ảnh hưởng đến các mối quan hệ xã hội</h2>
-    <ul>
-      <li>Xa cách gia đình, bạn bè vì chỉ tập trung vào game.</li>
-      <li>Thiếu kỹ năng giao tiếp, ngại tiếp xúc thực tế.</li>
-      <li>Dễ nảy sinh mâu thuẫn với người thân khi bị nhắc nhở.</li>
-    </ul>
+  function aiMove() {
+    if (gameOver) return;
+    let best = { score: -Infinity, row: -1, col: -1 };
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (cells[r][c] === '') {
+          const score = evaluateMove(r, c, ai) + evaluateMove(r, c, player) * 0.8;
+          if (score > best.score) best = { score, row: r, col: c };
+        }
+      }
+    }
+    move(best.row, best.col, ai);
+    if (checkWin(best.row, best.col, ai)) return endGame("AI thắng!");
+  }
 
-    <h2>Lời khuyên cho bạn Thắng</h2>
-    <p>Hãy chơi game một cách điều độ và hợp lý. Dành thời gian cho các hoạt động thể chất, học tập và giao tiếp xã hội để cân bằng cuộc sống. Game chỉ nên là phương tiện giải trí, không nên để nó kiểm soát bạn.</p>
+  function evaluateMove(r, c, char) {
+    let score = 0;
+    const dirs = [
+      [[0,1], [0,-1]], [[1,0], [-1,0]],
+      [[1,1], [-1,-1]], [[1,-1], [-1,1]]
+    ];
+    for (let [d1, d2] of dirs) {
+      let count = 1;
+      count += countDirection(r, c, d1[0], d1[1], char);
+      count += countDirection(r, c, d2[0], d2[1], char);
+      if (count >= 5) return 100000;
+      score += Math.pow(count, 3);
+    }
+    return score;
+  }
 
-    <div class="link">
-      <div class="arrow">➜</div>
-      <div><a href="https://www.thegioididong.com/tin-tuc/8-loi-ich-khong-tuong-cua-viec-choi-game-715277" target="_blank">Nhấn vào đây để xem minh hoạ</a></div>
-    </div>
-  </section>
+  function countDirection(r, c, dr, dc, char) {
+    let count = 0;
+    for (let i = 1; i < 5; i++) {
+      const nr = r + dr * i, nc = c + dc * i;
+      if (nr < 0 || nr >= size || nc < 0 || nc >= size || cells[nr][nc] !== char) break;
+      count++;
+    }
+    return count;
+  }
 
-  <footer>
-    &copy; 2025 - Sống Khỏe, Học mệt, Game không Giới Hạn!
-  </footer>
+  function checkWin(r, c, char) {
+    const dirs = [
+      [[0,1], [0,-1]], [[1,0], [-1,0]],
+      [[1,1], [-1,-1]], [[1,-1], [-1,1]]
+    ];
+    for (let [d1, d2] of dirs) {
+      let count = 1;
+      count += countDirection(r, c, d1[0], d1[1], char);
+      count += countDirection(r, c, d2[0], d2[1], char);
+      if (count >= 5) return true;
+    }
+    return false;
+  }
 
+  function endGame(msg) {
+    status.textContent = msg;
+    gameOver = true;
+  }
+
+  function resetGame() {
+    createBoard();
+    status.textContent = "Lượt của bạn (X)";
+    gameOver = false;
+  }
+
+  createBoard();
+</script>
 </body>
 </html>
