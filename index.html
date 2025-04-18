@@ -1,155 +1,225 @@
-<!DOCTYPE html>
-<html lang="vi">
+<!DOCTYPE html><html>
 <head>
   <meta charset="UTF-8">
-  <title>Caro vs AI</title>
+  <title>Caro AI Khét Nhất</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      margin: 0;
-      background: #eee;
-    }
-    h1 { margin: 20px 0 10px; }
-    #board {
-      display: grid;
-      grid-template-columns: repeat(20, 30px);
-      grid-template-rows: repeat(20, 30px);
-      gap: 1px;
-      margin: 20px auto;
-      width: fit-content;
-      background: #444;
-    }
-    .cell {
-      width: 30px;
-      height: 30px;
-      background: #fff;
+    body { text-align: center; font-family: sans-serif; }
+    table { border-collapse: collapse; margin: 20px auto; }
+    td {
+      width: 28px; height: 28px;
+      border: 1px solid #ccc;
       font-size: 20px;
-      line-height: 30px;
       text-align: center;
       cursor: pointer;
     }
-    #status {
-      font-size: 18px;
-      margin-top: 10px;
-    }
-    button {
-      margin-top: 10px;
-      padding: 8px 16px;
-    }
+    .x { color: red; }
+    .o { color: blue; }
+    button { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
   </style>
 </head>
 <body>
+  <h2>Game Caro 20x20 - AI Siêu Cấp</h2>
+  <table id="board"></table>
+  <button onclick="resetGame()">Chơi lại</button>  <script>
+    const SIZE = 20;
+    let board = [];
+    let gameOver = false;
 
-<h1>Caro - Bạn vs AI</h1>
-<div id="board"></div>
-<div id="status">Lượt của bạn (X)</div>
-<button onclick="resetGame()">Chơi lại</button>
-
-<script>
-  const size = 20;
-  const board = document.getElementById("board");
-  const status = document.getElementById("status");
-  let cells = [], player = 'X', ai = 'O', gameOver = false;
-
-  function createBoard() {
-    board.innerHTML = '';
-    cells = Array.from({ length: size }, () => Array(size).fill(''));
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        const cell = document.createElement("div");
-        cell.className = "cell";
-        cell.dataset.row = r;
-        cell.dataset.col = c;
-        cell.addEventListener("click", handleClick);
-        board.appendChild(cell);
+    function createBoard() {
+      const table = document.getElementById("board");
+      table.innerHTML = "";
+      board = [];
+      for (let i = 0; i < SIZE; i++) {
+        const row = [];
+        const tr = document.createElement("tr");
+        for (let j = 0; j < SIZE; j++) {
+          row.push("");
+          const td = document.createElement("td");
+          td.id = `${i}-${j}`;
+          td.onclick = () => playerMove(i, j);
+          tr.appendChild(td);
+        }
+        board.push(row);
+        table.appendChild(tr);
       }
     }
-  }
 
-  function handleClick(e) {
-    if (gameOver) return;
-    const r = +e.target.dataset.row;
-    const c = +e.target.dataset.col;
-    if (cells[r][c]) return;
-    move(r, c, player);
-    if (checkWin(r, c, player)) return endGame("Bạn thắng!");
-    setTimeout(aiMove, 100);
-  }
+    function resetGame() {
+      gameOver = false;
+      createBoard();
+      setTimeout(() => aiMove(), 300);
+    }
 
-  function move(r, c, char) {
-    cells[r][c] = char;
-    const cell = document.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
-    cell.textContent = char;
-  }
+    function renderCell(x, y, symbol) {
+      const cell = document.getElementById(`${x}-${y}`);
+      cell.className = symbol.toLowerCase();
+      cell.textContent = symbol;
+    }
 
-  function aiMove() {
-    if (gameOver) return;
-    let best = { score: -Infinity, row: -1, col: -1 };
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        if (cells[r][c] === '') {
-          const score = evaluateMove(r, c, ai) + evaluateMove(r, c, player) * 0.8;
-          if (score > best.score) best = { score, row: r, col: c };
+    function playerMove(x, y) {
+      if (gameOver || board[x][y] !== "") return;
+      board[x][y] = "O";
+      renderCell(x, y, "O");
+      if (checkWin(x, y, "O")) {
+        alert("Bạn thắng!");
+        gameOver = true;
+        return;
+      }
+      setTimeout(() => aiMove(), 100);
+    }
+
+    function aiMove() {
+      if (gameOver) return;
+      const [x, y] = findBestMove(board, 2);
+      board[x][y] = "X";
+      renderCell(x, y, "X");
+      if (checkWin(x, y, "X")) {
+        alert("AI thắng!");
+        gameOver = true;
+      }
+    }
+
+    function checkWin(x, y, symbol) {
+      const dirs = [
+        [1, 0], [0, 1], [1, 1], [1, -1]
+      ];
+      for (const [dx, dy] of dirs) {
+        let count = 1;
+        for (let d = 1; d < 5; d++) {
+          const nx = x + dx * d, ny = y + dy * d;
+          if (!inBounds(nx, ny) || board[nx][ny] !== symbol) break;
+          count++;
+        }
+        for (let d = 1; d < 5; d++) {
+          const nx = x - dx * d, ny = y - dy * d;
+          if (!inBounds(nx, ny) || board[nx][ny] !== symbol) break;
+          count++;
+        }
+        if (count >= 5) return true;
+      }
+      return false;
+    }
+
+    function inBounds(x, y) {
+      return x >= 0 && y >= 0 && x < SIZE && y < SIZE;
+    }
+
+    function cloneBoard(b) {
+      return b.map(row => row.slice());
+    }
+
+    function getMoves(b) {
+      const moves = [];
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE; j++) {
+          if (b[i][j] === "") {
+            for (let dx = -1; dx <= 1; dx++) {
+              for (let dy = -1; dy <= 1; dy++) {
+                const ni = i + dx, nj = j + dy;
+                if (inBounds(ni, nj) && b[ni][nj] !== "") {
+                  moves.push([i, j]);
+                  dx = dy = 2; // break both loops
+                }
+              }
+            }
+          }
         }
       }
+      return moves.length ? moves : [[10,10]];
     }
-    move(best.row, best.col, ai);
-    if (checkWin(best.row, best.col, ai)) return endGame("AI thắng!");
-  }
 
-  function evaluateMove(r, c, char) {
-    let score = 0;
-    const dirs = [
-      [[0,1], [0,-1]], [[1,0], [-1,0]],
-      [[1,1], [-1,-1]], [[1,-1], [-1,1]]
-    ];
-    for (let [d1, d2] of dirs) {
-      let count = 1;
-      count += countDirection(r, c, d1[0], d1[1], char);
-      count += countDirection(r, c, d2[0], d2[1], char);
+    function scoreLine(count, openEnds) {
       if (count >= 5) return 100000;
-      score += Math.pow(count, 3);
+      if (count === 4 && openEnds === 2) return 10000;
+      if (count === 4 && openEnds === 1) return 1000;
+      if (count === 3 && openEnds === 2) return 500;
+      if (count === 3 && openEnds === 1) return 50;
+      if (count === 2 && openEnds === 2) return 10;
+      if (count === 2 && openEnds === 1) return 3;
+      return 0;
     }
-    return score;
-  }
 
-  function countDirection(r, c, dr, dc, char) {
-    let count = 0;
-    for (let i = 1; i < 5; i++) {
-      const nr = r + dr * i, nc = c + dc * i;
-      if (nr < 0 || nr >= size || nc < 0 || nc >= size || cells[nr][nc] !== char) break;
-      count++;
+    function evaluate(b, symbol) {
+      let score = 0;
+      const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+      for (let x = 0; x < SIZE; x++) {
+        for (let y = 0; y < SIZE; y++) {
+          if (b[x][y] !== symbol) continue;
+          for (const [dx, dy] of dirs) {
+            let count = 1, open = 0;
+            for (let i = 1; i < 5; i++) {
+              const nx = x + dx * i, ny = y + dy * i;
+              if (inBounds(nx, ny)) {
+                if (b[nx][ny] === symbol) count++;
+                else if (b[nx][ny] === "") {
+                  open++;
+                  break;
+                } else break;
+              }
+            }
+            for (let i = 1; i < 5; i++) {
+              const nx = x - dx * i, ny = y - dy * i;
+              if (inBounds(nx, ny)) {
+                if (b[nx][ny] === symbol) count++;
+                else if (b[nx][ny] === "") {
+                  open++;
+                  break;
+                } else break;
+              }
+            }
+            score += scoreLine(count, open);
+          }
+        }
+      }
+      return score;
     }
-    return count;
-  }
 
-  function checkWin(r, c, char) {
-    const dirs = [
-      [[0,1], [0,-1]], [[1,0], [-1,0]],
-      [[1,1], [-1,-1]], [[1,-1], [-1,1]]
-    ];
-    for (let [d1, d2] of dirs) {
-      let count = 1;
-      count += countDirection(r, c, d1[0], d1[1], char);
-      count += countDirection(r, c, d2[0], d2[1], char);
-      if (count >= 5) return true;
+    function minimax(b, depth, alpha, beta, isMax) {
+      if (depth === 0) {
+        return evaluate(b, "X") - evaluate(b, "O");
+      }
+      const moves = getMoves(b);
+      if (isMax) {
+        let maxEval = -Infinity;
+        for (const [x, y] of moves) {
+          const newBoard = cloneBoard(b);
+          newBoard[x][y] = "X";
+          const eval = minimax(newBoard, depth - 1, alpha, beta, false);
+          maxEval = Math.max(maxEval, eval);
+          alpha = Math.max(alpha, eval);
+          if (beta <= alpha) break;
+        }
+        return maxEval;
+      } else {
+        let minEval = Infinity;
+        for (const [x, y] of moves) {
+          const newBoard = cloneBoard(b);
+          newBoard[x][y] = "O";
+          const eval = minimax(newBoard, depth - 1, alpha, beta, true);
+          minEval = Math.min(minEval, eval);
+          beta = Math.min(beta, eval);
+          if (beta <= alpha) break;
+        }
+        return minEval;
+      }
     }
-    return false;
-  }
 
-  function endGame(msg) {
-    status.textContent = msg;
-    gameOver = true;
-  }
+    function findBestMove(b, depth) {
+      let bestScore = -Infinity;
+      let bestMove = [10, 10];
+      const moves = getMoves(b);
+      for (const [x, y] of moves) {
+        const newBoard = cloneBoard(b);
+        newBoard[x][y] = "X";
+        const score = minimax(newBoard, depth - 1, -Infinity, Infinity, false);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = [x, y];
+        }
+      }
+      return bestMove;
+    }
 
-  function resetGame() {
-    createBoard();
-    status.textContent = "Lượt của bạn (X)";
-    gameOver = false;
-  }
-
-  createBoard();
-</script>
-</body>
+    resetGame();
+  </script></body>
 </html>
