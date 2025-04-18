@@ -1,155 +1,217 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <title>Caro vs AI</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flappy Đom Đóm</title>
   <style>
-    body {
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #000428, #004e92);
       font-family: sans-serif;
-      text-align: center;
-      margin: 0;
-      background: #eee;
     }
-    h1 { margin: 20px 0 10px; }
-    #board {
-      display: grid;
-      grid-template-columns: repeat(20, 30px);
-      grid-template-rows: repeat(20, 30px);
-      gap: 1px;
-      margin: 20px auto;
-      width: fit-content;
-      background: #444;
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
     }
-    .cell {
+
+    #firefly {
+      position: absolute;
       width: 30px;
       height: 30px;
-      background: #fff;
-      font-size: 20px;
-      line-height: 30px;
+      top: 40%;
+      left: 50px;
+      border-radius: 50%;
+      background: yellow;
+      box-shadow: 0 0 10px 4px rgba(255,255,100,0.9);
+      transition: top 0.1s;
+    }
+
+    #firefly.flap::before, #firefly.flap::after {
+      animation: flapWing 0.2s ease;
+    }
+
+    #firefly::before, #firefly::after {
+      content: '';
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      background: rgba(200, 200, 255, 0.6);
+      border-radius: 50%;
+      top: 2px;
+    }
+
+    #firefly::before { left: -10px; transform: rotate(-20deg); }
+    #firefly::after { right: -10px; transform: rotate(20deg); }
+
+    @keyframes flapWing {
+      0% { transform: scale(1) rotate(20deg); }
+      50% { transform: scale(0.8) rotate(0deg); }
+      100% { transform: scale(1) rotate(20deg); }
+    }
+
+    .pipe {
+      position: absolute;
+      width: 60px;
+      background: linear-gradient(to bottom, green, darkgreen);
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      width: 100%;
       text-align: center;
+      font-size: 32px;
+      color: white;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px black;
+    }
+
+    #startBtn, #restartBtn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 14px 24px;
+      font-size: 20px;
+      background: orange;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      display: none;
       cursor: pointer;
-    }
-    #status {
-      font-size: 18px;
-      margin-top: 10px;
-    }
-    button {
-      margin-top: 10px;
-      padding: 8px 16px;
     }
   </style>
 </head>
 <body>
+  <div id="game">
+    <div id="score">Điểm: 0</div>
+    <div id="firefly"></div>
+    <button id="startBtn">Bắt đầu</button>
+    <button id="restartBtn">Chơi lại</button>
+    <audio id="bgMusic" loop>
+      <source src="thienlyba.mp3" type="audio/mpeg" />
+    </audio>
+  </div>
 
-<h1>Caro - Bạn vs AI</h1>
-<div id="board"></div>
-<div id="status">Lượt của bạn (X)</div>
-<button onclick="resetGame()">Chơi lại</button>
+  <script>
+    const game = document.getElementById("game");
+    const firefly = document.getElementById("firefly");
+    const scoreEl = document.getElementById("score");
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const bgMusic = document.getElementById("bgMusic");
 
-<script>
-  const size = 20;
-  const board = document.getElementById("board");
-  const status = document.getElementById("status");
-  let cells = [], player = 'X', ai = 'O', gameOver = false;
-
-  function createBoard() {
-    board.innerHTML = '';
-    cells = Array.from({ length: size }, () => Array(size).fill(''));
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        const cell = document.createElement("div");
-        cell.className = "cell";
-        cell.dataset.row = r;
-        cell.dataset.col = c;
-        cell.addEventListener("click", handleClick);
-        board.appendChild(cell);
-      }
-    }
-  }
-
-  function handleClick(e) {
-    if (gameOver) return;
-    const r = +e.target.dataset.row;
-    const c = +e.target.dataset.col;
-    if (cells[r][c]) return;
-    move(r, c, player);
-    if (checkWin(r, c, player)) return endGame("Bạn thắng!");
-    setTimeout(aiMove, 100);
-  }
-
-  function move(r, c, char) {
-    cells[r][c] = char;
-    const cell = document.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
-    cell.textContent = char;
-  }
-
-  function aiMove() {
-    if (gameOver) return;
-    let best = { score: -Infinity, row: -1, col: -1 };
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        if (cells[r][c] === '') {
-          const score = evaluateMove(r, c, ai) + evaluateMove(r, c, player) * 0.8;
-          if (score > best.score) best = { score, row: r, col: c };
-        }
-      }
-    }
-    move(best.row, best.col, ai);
-    if (checkWin(best.row, best.col, ai)) return endGame("AI thắng!");
-  }
-
-  function evaluateMove(r, c, char) {
+    let fireflyY = game.clientHeight / 2;
+    let velocity = 0;
+    let gravity = 0.2;
+    let jump = -5;
+    let isPlaying = false;
+    let pipes = [];
     let score = 0;
-    const dirs = [
-      [[0,1], [0,-1]], [[1,0], [-1,0]],
-      [[1,1], [-1,-1]], [[1,-1], [-1,1]]
-    ];
-    for (let [d1, d2] of dirs) {
-      let count = 1;
-      count += countDirection(r, c, d1[0], d1[1], char);
-      count += countDirection(r, c, d2[0], d2[1], char);
-      if (count >= 5) return 100000;
-      score += Math.pow(count, 3);
+    let gameInterval, pipeInterval;
+
+    function resetGame() {
+      pipes.forEach(p => p.remove());
+      pipes = [];
+      fireflyY = game.clientHeight / 2;
+      velocity = 0;
+      firefly.style.top = fireflyY + "px";
+      score = 0;
+      scoreEl.textContent = "Điểm: 0";
     }
-    return score;
-  }
 
-  function countDirection(r, c, dr, dc, char) {
-    let count = 0;
-    for (let i = 1; i < 5; i++) {
-      const nr = r + dr * i, nc = c + dc * i;
-      if (nr < 0 || nr >= size || nc < 0 || nc >= size || cells[nr][nc] !== char) break;
-      count++;
+    function startGame() {
+      resetGame();
+      isPlaying = true;
+      startBtn.style.display = "none";
+      restartBtn.style.display = "none";
+      bgMusic.play();
+
+      gameInterval = setInterval(() => {
+        velocity += gravity;
+        fireflyY += velocity;
+        firefly.style.top = fireflyY + "px";
+
+        if (fireflyY > game.clientHeight - 30 || fireflyY < 0) endGame();
+
+        pipes.forEach(pipe => {
+          pipe.style.left = (parseInt(pipe.style.left) - 3) + "px"; // tốc độ nhanh hơn
+
+          const pipeLeft = parseInt(pipe.style.left);
+          const pipeTop = parseInt(pipe.style.top);
+          const pipeHeight = parseInt(pipe.style.height);
+          const fireflyTop = fireflyY;
+          const fireflyBottom = fireflyY + 30;
+
+          if (
+            pipeLeft < 90 && pipeLeft + 60 > 50 &&
+            (
+              (pipe.classList.contains("top") && fireflyTop < pipeHeight) ||
+              (!pipe.classList.contains("top") && fireflyBottom > pipeTop)
+            )
+          ) {
+            endGame();
+          }
+
+          if (pipeLeft === 48 && pipe.classList.contains("top")) {
+            score++;
+            scoreEl.textContent = "Điểm: " + score;
+          }
+        });
+
+        pipes = pipes.filter(pipe => parseInt(pipe.style.left) > -60);
+      }, 20);
+
+      pipeInterval = setInterval(() => {
+        const gap = 140;
+        const topHeight = Math.floor(Math.random() * 250) + 50;
+        const bottomTop = topHeight + gap;
+
+        const topPipe = document.createElement("div");
+        topPipe.classList.add("pipe", "top");
+        topPipe.style.height = topHeight + "px";
+        topPipe.style.top = "0px";
+        topPipe.style.left = game.clientWidth + "px";
+
+        const bottomPipe = document.createElement("div");
+        bottomPipe.classList.add("pipe", "bottom");
+        bottomPipe.style.height = (game.clientHeight - bottomTop) + "px";
+        bottomPipe.style.top = bottomTop + "px";
+        bottomPipe.style.left = game.clientWidth + "px";
+
+        game.appendChild(topPipe);
+        game.appendChild(bottomPipe);
+        pipes.push(topPipe, bottomPipe);
+      }, 1800);
     }
-    return count;
-  }
 
-  function checkWin(r, c, char) {
-    const dirs = [
-      [[0,1], [0,-1]], [[1,0], [-1,0]],
-      [[1,1], [-1,-1]], [[1,-1], [-1,1]]
-    ];
-    for (let [d1, d2] of dirs) {
-      let count = 1;
-      count += countDirection(r, c, d1[0], d1[1], char);
-      count += countDirection(r, c, d2[0], d2[1], char);
-      if (count >= 5) return true;
+    function endGame() {
+      clearInterval(gameInterval);
+      clearInterval(pipeInterval);
+      isPlaying = false;
+      restartBtn.style.display = "block";
+      bgMusic.pause();
+      bgMusic.currentTime = 0;
     }
-    return false;
-  }
 
-  function endGame(msg) {
-    status.textContent = msg;
-    gameOver = true;
-  }
+    function flap() {
+      if (!isPlaying) return;
+      velocity = jump;
+      firefly.classList.add("flap");
+      setTimeout(() => firefly.classList.remove("flap"), 200);
+    }
 
-  function resetGame() {
-    createBoard();
-    status.textContent = "Lượt của bạn (X)";
-    gameOver = false;
-  }
+    window.addEventListener("touchstart", flap);
+    window.addEventListener("mousedown", flap);
 
-  createBoard();
-</script>
+    startBtn.onclick = startGame;
+    restartBtn.onclick = startGame;
+
+    startBtn.style.display = "block";
+  </script>
 </body>
 </html>
