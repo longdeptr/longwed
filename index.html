@@ -1,225 +1,217 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <title>Caro AI Khét Nhất</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flappy Đom Đóm</title>
   <style>
-    body { text-align: center; font-family: sans-serif; }
-    table { border-collapse: collapse; margin: 20px auto; }
-    td {
-      width: 28px; height: 28px;
-      border: 1px solid #ccc;
-      font-size: 20px;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(to bottom, #000428, #004e92);
+      font-family: sans-serif;
+    }
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #firefly {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      top: 40%;
+      left: 50px;
+      border-radius: 50%;
+      background: yellow;
+      box-shadow: 0 0 10px 4px rgba(255,255,100,0.9);
+      transition: top 0.1s;
+    }
+
+    #firefly.flap::before, #firefly.flap::after {
+      animation: flapWing 0.2s ease;
+    }
+
+    #firefly::before, #firefly::after {
+      content: '';
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      background: rgba(200, 200, 255, 0.6);
+      border-radius: 50%;
+      top: 2px;
+    }
+
+    #firefly::before { left: -10px; transform: rotate(-20deg); }
+    #firefly::after { right: -10px; transform: rotate(20deg); }
+
+    @keyframes flapWing {
+      0% { transform: scale(1) rotate(20deg); }
+      50% { transform: scale(0.8) rotate(0deg); }
+      100% { transform: scale(1) rotate(20deg); }
+    }
+
+    .pipe {
+      position: absolute;
+      width: 60px;
+      background: linear-gradient(to bottom, green, darkgreen);
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      width: 100%;
       text-align: center;
+      font-size: 32px;
+      color: white;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px black;
+    }
+
+    #startBtn, #restartBtn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 14px 24px;
+      font-size: 20px;
+      background: orange;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      display: none;
       cursor: pointer;
     }
-    .x { color: red; }
-    .o { color: blue; }
-    button { margin-top: 10px; padding: 8px 16px; font-size: 16px; }
   </style>
 </head>
 <body>
-  <h2>Game Caro 20x20 - AI Siêu Cấp</h2>
-  <table id="board"></table>
-  <button onclick="resetGame()">Chơi lại</button>  <script>
-    const SIZE = 20;
-    let board = [];
-    let gameOver = false;
+  <div id="game">
+    <div id="score">Điểm: 0</div>
+    <div id="firefly"></div>
+    <button id="startBtn">Bắt đầu</button>
+    <button id="restartBtn">Chơi lại</button>
+    <audio id="bgMusic" loop>
+      <source src="thienlyba.mp3" type="audio/mpeg" />
+    </audio>
+  </div>
 
-    function createBoard() {
-      const table = document.getElementById("board");
-      table.innerHTML = "";
-      board = [];
-      for (let i = 0; i < SIZE; i++) {
-        const row = [];
-        const tr = document.createElement("tr");
-        for (let j = 0; j < SIZE; j++) {
-          row.push("");
-          const td = document.createElement("td");
-          td.id = `${i}-${j}`;
-          td.onclick = () => playerMove(i, j);
-          tr.appendChild(td);
-        }
-        board.push(row);
-        table.appendChild(tr);
-      }
-    }
+  <script>
+    const game = document.getElementById("game");
+    const firefly = document.getElementById("firefly");
+    const scoreEl = document.getElementById("score");
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const bgMusic = document.getElementById("bgMusic");
+
+    let fireflyY = game.clientHeight / 2;
+    let velocity = 0;
+    let gravity = 0.2;
+    let jump = -5;
+    let isPlaying = false;
+    let pipes = [];
+    let score = 0;
+    let gameInterval, pipeInterval;
 
     function resetGame() {
-      gameOver = false;
-      createBoard();
-      setTimeout(() => aiMove(), 300);
+      pipes.forEach(p => p.remove());
+      pipes = [];
+      fireflyY = game.clientHeight / 2;
+      velocity = 0;
+      firefly.style.top = fireflyY + "px";
+      score = 0;
+      scoreEl.textContent = "Điểm: 0";
     }
 
-    function renderCell(x, y, symbol) {
-      const cell = document.getElementById(`${x}-${y}`);
-      cell.className = symbol.toLowerCase();
-      cell.textContent = symbol;
-    }
+    function startGame() {
+      resetGame();
+      isPlaying = true;
+      startBtn.style.display = "none";
+      restartBtn.style.display = "none";
+      bgMusic.play();
 
-    function playerMove(x, y) {
-      if (gameOver || board[x][y] !== "") return;
-      board[x][y] = "O";
-      renderCell(x, y, "O");
-      if (checkWin(x, y, "O")) {
-        alert("Bạn thắng!");
-        gameOver = true;
-        return;
-      }
-      setTimeout(() => aiMove(), 100);
-    }
+      gameInterval = setInterval(() => {
+        velocity += gravity;
+        fireflyY += velocity;
+        firefly.style.top = fireflyY + "px";
 
-    function aiMove() {
-      if (gameOver) return;
-      const [x, y] = findBestMove(board, 2);
-      board[x][y] = "X";
-      renderCell(x, y, "X");
-      if (checkWin(x, y, "X")) {
-        alert("AI thắng!");
-        gameOver = true;
-      }
-    }
+        if (fireflyY > game.clientHeight - 30 || fireflyY < 0) endGame();
 
-    function checkWin(x, y, symbol) {
-      const dirs = [
-        [1, 0], [0, 1], [1, 1], [1, -1]
-      ];
-      for (const [dx, dy] of dirs) {
-        let count = 1;
-        for (let d = 1; d < 5; d++) {
-          const nx = x + dx * d, ny = y + dy * d;
-          if (!inBounds(nx, ny) || board[nx][ny] !== symbol) break;
-          count++;
-        }
-        for (let d = 1; d < 5; d++) {
-          const nx = x - dx * d, ny = y - dy * d;
-          if (!inBounds(nx, ny) || board[nx][ny] !== symbol) break;
-          count++;
-        }
-        if (count >= 5) return true;
-      }
-      return false;
-    }
+        pipes.forEach(pipe => {
+          pipe.style.left = (parseInt(pipe.style.left) - 3) + "px"; // tốc độ nhanh hơn
 
-    function inBounds(x, y) {
-      return x >= 0 && y >= 0 && x < SIZE && y < SIZE;
-    }
+          const pipeLeft = parseInt(pipe.style.left);
+          const pipeTop = parseInt(pipe.style.top);
+          const pipeHeight = parseInt(pipe.style.height);
+          const fireflyTop = fireflyY;
+          const fireflyBottom = fireflyY + 30;
 
-    function cloneBoard(b) {
-      return b.map(row => row.slice());
-    }
-
-    function getMoves(b) {
-      const moves = [];
-      for (let i = 0; i < SIZE; i++) {
-        for (let j = 0; j < SIZE; j++) {
-          if (b[i][j] === "") {
-            for (let dx = -1; dx <= 1; dx++) {
-              for (let dy = -1; dy <= 1; dy++) {
-                const ni = i + dx, nj = j + dy;
-                if (inBounds(ni, nj) && b[ni][nj] !== "") {
-                  moves.push([i, j]);
-                  dx = dy = 2; // break both loops
-                }
-              }
-            }
+          if (
+            pipeLeft < 90 && pipeLeft + 60 > 50 &&
+            (
+              (pipe.classList.contains("top") && fireflyTop < pipeHeight) ||
+              (!pipe.classList.contains("top") && fireflyBottom > pipeTop)
+            )
+          ) {
+            endGame();
           }
-        }
-      }
-      return moves.length ? moves : [[10,10]];
-    }
 
-    function scoreLine(count, openEnds) {
-      if (count >= 5) return 100000;
-      if (count === 4 && openEnds === 2) return 10000;
-      if (count === 4 && openEnds === 1) return 1000;
-      if (count === 3 && openEnds === 2) return 500;
-      if (count === 3 && openEnds === 1) return 50;
-      if (count === 2 && openEnds === 2) return 10;
-      if (count === 2 && openEnds === 1) return 3;
-      return 0;
-    }
-
-    function evaluate(b, symbol) {
-      let score = 0;
-      const dirs = [[1,0],[0,1],[1,1],[1,-1]];
-      for (let x = 0; x < SIZE; x++) {
-        for (let y = 0; y < SIZE; y++) {
-          if (b[x][y] !== symbol) continue;
-          for (const [dx, dy] of dirs) {
-            let count = 1, open = 0;
-            for (let i = 1; i < 5; i++) {
-              const nx = x + dx * i, ny = y + dy * i;
-              if (inBounds(nx, ny)) {
-                if (b[nx][ny] === symbol) count++;
-                else if (b[nx][ny] === "") {
-                  open++;
-                  break;
-                } else break;
-              }
-            }
-            for (let i = 1; i < 5; i++) {
-              const nx = x - dx * i, ny = y - dy * i;
-              if (inBounds(nx, ny)) {
-                if (b[nx][ny] === symbol) count++;
-                else if (b[nx][ny] === "") {
-                  open++;
-                  break;
-                } else break;
-              }
-            }
-            score += scoreLine(count, open);
+          if (pipeLeft === 48 && pipe.classList.contains("top")) {
+            score++;
+            scoreEl.textContent = "Điểm: " + score;
           }
-        }
-      }
-      return score;
+        });
+
+        pipes = pipes.filter(pipe => parseInt(pipe.style.left) > -60);
+      }, 20);
+
+      pipeInterval = setInterval(() => {
+        const gap = 140;
+        const topHeight = Math.floor(Math.random() * 250) + 50;
+        const bottomTop = topHeight + gap;
+
+        const topPipe = document.createElement("div");
+        topPipe.classList.add("pipe", "top");
+        topPipe.style.height = topHeight + "px";
+        topPipe.style.top = "0px";
+        topPipe.style.left = game.clientWidth + "px";
+
+        const bottomPipe = document.createElement("div");
+        bottomPipe.classList.add("pipe", "bottom");
+        bottomPipe.style.height = (game.clientHeight - bottomTop) + "px";
+        bottomPipe.style.top = bottomTop + "px";
+        bottomPipe.style.left = game.clientWidth + "px";
+
+        game.appendChild(topPipe);
+        game.appendChild(bottomPipe);
+        pipes.push(topPipe, bottomPipe);
+      }, 1800);
     }
 
-    function minimax(b, depth, alpha, beta, isMax) {
-      if (depth === 0) {
-        return evaluate(b, "X") - evaluate(b, "O");
-      }
-      const moves = getMoves(b);
-      if (isMax) {
-        let maxEval = -Infinity;
-        for (const [x, y] of moves) {
-          const newBoard = cloneBoard(b);
-          newBoard[x][y] = "X";
-          const eval = minimax(newBoard, depth - 1, alpha, beta, false);
-          maxEval = Math.max(maxEval, eval);
-          alpha = Math.max(alpha, eval);
-          if (beta <= alpha) break;
-        }
-        return maxEval;
-      } else {
-        let minEval = Infinity;
-        for (const [x, y] of moves) {
-          const newBoard = cloneBoard(b);
-          newBoard[x][y] = "O";
-          const eval = minimax(newBoard, depth - 1, alpha, beta, true);
-          minEval = Math.min(minEval, eval);
-          beta = Math.min(beta, eval);
-          if (beta <= alpha) break;
-        }
-        return minEval;
-      }
+    function endGame() {
+      clearInterval(gameInterval);
+      clearInterval(pipeInterval);
+      isPlaying = false;
+      restartBtn.style.display = "block";
+      bgMusic.pause();
+      bgMusic.currentTime = 0;
     }
 
-    function findBestMove(b, depth) {
-      let bestScore = -Infinity;
-      let bestMove = [10, 10];
-      const moves = getMoves(b);
-      for (const [x, y] of moves) {
-        const newBoard = cloneBoard(b);
-        newBoard[x][y] = "X";
-        const score = minimax(newBoard, depth - 1, -Infinity, Infinity, false);
-        if (score > bestScore) {
-          bestScore = score;
-          bestMove = [x, y];
-        }
-      }
-      return bestMove;
+    function flap() {
+      if (!isPlaying) return;
+      velocity = jump;
+      firefly.classList.add("flap");
+      setTimeout(() => firefly.classList.remove("flap"), 200);
     }
 
-    resetGame();
-  </script></body>
+    window.addEventListener("touchstart", flap);
+    window.addEventListener("mousedown", flap);
+
+    startBtn.onclick = startGame;
+    restartBtn.onclick = startGame;
+
+    startBtn.style.display = "block";
+  </script>
+</body>
 </html>
