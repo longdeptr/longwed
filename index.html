@@ -11,11 +11,7 @@
       font-family: sans-serif;
       color: #fff;
     }
-    canvas {
-      display: block;
-      margin: 0 auto;
-      background: transparent;
-    }
+    canvas { display: block; margin: 0 auto; background: transparent; }
     #scoreboard {
       position: absolute;
       top: 10px;
@@ -23,7 +19,7 @@
       transform: translateX(-50%);
       font-size: 20px;
     }
-    #startBtn, #restartBtn, #rankingBtn {
+    button {
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
@@ -61,22 +57,6 @@
 <button id="restartBtn">Chơi lại</button>
 <button id="rankingBtn">BXH</button>
 <div id="rankingBoard">Đang tải BXH...</div>
-
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyC5JeYI5DKcmF3ZTIOiTH23dmDzfA_NVDs",
-  authDomain: "flappy-firefly-bxh.firebaseapp.com",
-  databaseURL: "https://flappy-firefly-bxh-default-rtdb.firebaseio.com",
-  projectId: "flappy-firefly-bxh",
-  storageBucket: "flappy-firefly-bxh.appspot.com",
-  messagingSenderId: "469933896947",
-  appId: "1:469933896947:web:46fdb11940b8b1a2f9cf65"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-</script>
 
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -140,28 +120,16 @@ function drawFirefly() {
 
 function drawPipes() {
   pipes.forEach(p => {
-    const radius = 15;
+    ctx.save();
+    if (p.tilt) {
+      ctx.translate(p.x + p.width / 2, 0);
+      ctx.rotate(p.angle);
+      ctx.translate(-p.x - p.width / 2, 0);
+    }
     ctx.fillStyle = "#44FF99";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    ctx.moveTo(p.x, 0);
-    ctx.lineTo(p.x + p.width, 0);
-    ctx.lineTo(p.x + p.width, p.top);
-    ctx.lineTo(p.x, p.top);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = "#228855";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(p.x, canvas.height);
-    ctx.lineTo(p.x + p.width, canvas.height);
-    ctx.lineTo(p.x + p.width, canvas.height - p.bottom);
-    ctx.lineTo(p.x, canvas.height - p.bottom);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillRect(p.x, 0, p.width, p.top);
+    ctx.fillRect(p.x, canvas.height - p.bottom, p.width, p.bottom);
+    ctx.restore();
   });
 }
 
@@ -184,7 +152,16 @@ function update() {
   if (Date.now() - lastPipeTime > 1500) {
     let gap = 120;
     let top = Math.random() * (canvas.height - gap - 100) + 20;
-    pipes.push({ x: canvas.width, width: 50, top: top, bottom: canvas.height - top - gap });
+    let tilt = score >= 20;
+    let angle = (Math.random() - 0.5) * 0.3;
+    pipes.push({
+      x: canvas.width,
+      width: 50,
+      top: top,
+      bottom: canvas.height - top - gap,
+      tilt: tilt,
+      angle: angle
+    });
     lastPipeTime = Date.now();
   }
 
@@ -197,18 +174,17 @@ function update() {
   birds = birds.filter(b => b.x > -20);
 
   pipes.forEach(p => {
-    if (firefly.x + firefly.size/2 > p.x &&
-        firefly.x - firefly.size/2 < p.x + p.width &&
-        (firefly.y - firefly.size/2 < p.top || firefly.y + firefly.size/2 > canvas.height - p.bottom)) {
-      gameOver();
-    } else if (p.x + p.width === firefly.x) {
+    let inX = firefly.x + firefly.size / 2 > p.x && firefly.x - firefly.size / 2 < p.x + p.width;
+    let hitY = firefly.y - firefly.size / 2 < p.top || firefly.y + firefly.size / 2 > canvas.height - p.bottom;
+    if (inX && hitY) gameOver();
+    else if (p.x + p.width === firefly.x) {
       score++;
       if (score % 5 === 0) gameSpeed += 0.2;
     }
   });
 
   birds.forEach(b => {
-    if (Math.hypot(b.x - firefly.x, b.y - firefly.y) < firefly.size/2 + 10) gameOver();
+    if (Math.hypot(b.x - firefly.x, b.y - firefly.y) < firefly.size / 2 + 10) gameOver();
   });
 
   if (firefly.y > canvas.height || firefly.y < 0) gameOver();
@@ -239,39 +215,36 @@ function jump() {
   firefly.vy = -6;
 }
 
+function saveScore() {
+  let list = JSON.parse(localStorage.getItem("fireflyScores") || "[]");
+  list.push({ name: playerName, score: score, time: new Date().toLocaleTimeString() });
+  list.sort((a, b) => b.score - a.score);
+  list = list.slice(0, 5);
+  localStorage.setItem("fireflyScores", JSON.stringify(list));
+}
+
+function loadRanking() {
+  const box = document.getElementById("rankingBoard");
+  let list = JSON.parse(localStorage.getItem("fireflyScores") || "[]");
+  box.innerHTML = "BXH Offline:<br>" + list.map((e, i) => `${i + 1}. ${e.name}: ${e.score} (${e.time})`).join("<br>");
+}
+
 document.addEventListener("keydown", e => { if (e.code === "Space") jump(); });
 canvas.addEventListener("click", jump);
-
 document.getElementById("startBtn").onclick = () => {
   started = true;
   document.getElementById("startBtn").style.display = "none";
   resetGame();
 };
-
 document.getElementById("restartBtn").onclick = () => {
   resetGame();
   document.getElementById("restartBtn").style.display = "none";
 };
-
 document.getElementById("rankingBtn").onclick = () => {
   const box = document.getElementById("rankingBoard");
   box.style.display = box.style.display === "none" ? "block" : "none";
   if (box.style.display === "block") loadRanking();
 };
-
-function saveScore() {
-  db.ref("ranking").push({ name: playerName, score: score, time: new Date().toLocaleTimeString() });
-}
-
-function loadRanking() {
-  const box = document.getElementById("rankingBoard");
-  db.ref("ranking").orderByChild("score").limitToLast(5).once("value", snap => {
-    let arr = [];
-    snap.forEach(child => arr.push(child.val()));
-    arr = arr.reverse();
-    box.innerHTML = "BXH Online:<br>" + arr.map((e, i) => `${i+1}. ${e.name}: ${e.score} (${e.time})`).join("<br>");
-  });
-}
 
 resetGame();
 loop();
