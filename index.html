@@ -11,7 +11,7 @@
     }
     canvas {
       display: block;
-      background: url('https://images.unsplash.com/photo-1508766206392-8bd5cf550d1b?auto=format&fit=crop&w=400&q=80') center/cover no-repeat;
+      background: url('https://cdn.pixabay.com/photo/2015/12/01/20/28/forest-1072828_1280.jpg') center/cover no-repeat;
     }
     #menu, #gameOverMenu, #countdown, #hud {
       position: absolute; top: 50%; left: 50%;
@@ -105,19 +105,19 @@ function drawPipes() {
   ctx.fillStyle = "#90e0ef";
   pipes.forEach(p => {
     ctx.save();
-    if (p.rotate && p.angle !== 0) {
-      ctx.translate(p.x + p.width/2, p.top/2);
+    if (p.type === 'tilt') {
+      ctx.translate(p.x + p.width / 2, p.top / 2);
       ctx.rotate(p.angle);
-      ctx.translate(-p.x - p.width/2, -p.top/2);
+      ctx.translate(-p.x - p.width / 2, -p.top / 2);
     }
     ctx.fillRect(p.x, 0, p.width, p.top);
     ctx.restore();
 
     ctx.save();
-    if (p.rotate && p.angle !== 0) {
-      ctx.translate(p.x + p.width/2, p.top + p.gap + (canvas.height - (p.top + p.gap))/2);
+    if (p.type === 'tilt') {
+      ctx.translate(p.x + p.width / 2, p.top + p.gap + (canvas.height - (p.top + p.gap)) / 2);
       ctx.rotate(-p.angle);
-      ctx.translate(-p.x - p.width/2, -(p.top + p.gap + (canvas.height - (p.top + p.gap))/2));
+      ctx.translate(-p.x - p.width / 2, -(p.top + p.gap + (canvas.height - (p.top + p.gap)) / 2));
     }
     ctx.fillRect(p.x, p.top + p.gap, p.width, canvas.height);
     ctx.restore();
@@ -127,32 +127,31 @@ function drawPipes() {
 function updatePipes() {
   if (frames % 100 === 0) {
     const top = Math.random() * 200 + 50;
-    const newPipe = {
+    let type = 'normal';
+    if (score >= 50) {
+      type = Math.random() < 0.33 ? 'shift' : Math.random() < 0.5 ? 'tilt' : 'normal';
+    } else if (score >= 20) {
+      type = Math.random() < 0.5 ? 'tilt' : 'normal';
+    }
+
+    pipes.push({
       x: canvas.width,
       width: 40,
       top: top,
       gap: 120,
       passed: false,
-      rotate: false,
+      type: type,
       angle: 0,
-      shift: 0,
-    };
-
-    if (score >= 20) {
-      const type = Math.floor(Math.random() * 3); // 0: thẳng, 1: nghiêng, 2: lắc
-      if (type === 1) newPipe.rotate = true;
-      else if (type === 2) newPipe.shift = Math.random() < 0.5 ? -1 : 1;
-    }
-
-    pipes.push(newPipe);
+      shift: type === 'shift' ? (Math.random() < 0.5 ? -1 : 1) : 0,
+    });
   }
 
   pipes.forEach(p => {
     p.x -= 2 + Math.min(score / 20, 3);
-    if (p.rotate) {
+    if (p.type === 'tilt') {
       p.angle = Math.sin(frames / 20) * 0.1;
     }
-    if (p.shift) {
+    if (p.type === 'shift') {
       p.top += Math.sin(frames / 15) * 0.5 * p.shift;
     }
   });
