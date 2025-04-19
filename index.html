@@ -99,16 +99,12 @@ let gravity = 0.4;
 let lift = -6;
 let bird, pipes, score, highScore = 0, gameOver = false, started = false;
 let frames = 0;
-let flyers = [];
-let reverseMode = false;
 
 function initVars() {
   bird = { x: 80, y: canvas.height / 2, radius: 15, velocity: 0 };
   pipes = [];
   score = 0;
-  flyers = [];
   gameOver = false;
-  reverseMode = false;
 }
 
 function drawBird() {
@@ -129,78 +125,29 @@ function drawBird() {
 function drawPipes() {
   ctx.fillStyle = "#90e0ef";
   pipes.forEach(p => {
-    ctx.save();
-    if (p.rotate) {
-      ctx.translate(p.x + p.width/2, p.top/2);
-      ctx.rotate(p.angle);
-      ctx.translate(-p.x - p.width/2, -p.top/2);
-    }
     ctx.fillRect(p.x, 0, p.width, p.top);
-    ctx.restore();
-
-    ctx.save();
-    if (p.rotate) {
-      ctx.translate(p.x + p.width/2, p.top + p.gap + (canvas.height - (p.top + p.gap))/2);
-      ctx.rotate(-p.angle);
-      ctx.translate(-p.x - p.width/2, -(p.top + p.gap + (canvas.height - (p.top + p.gap))/2));
-    }
     ctx.fillRect(p.x, p.top + p.gap, p.width, canvas.height);
-    ctx.restore();
   });
 }
 
 function updatePipes() {
   if (frames % 100 === 0) {
     const top = Math.random() * (canvas.height / 3) + 50;
-    const pipeType = score >= 50
-      ? ['normal', 'shift', 'rotate'][Math.floor(Math.random() * 3)]
-      : score >= 20
-        ? (Math.random() < 0.5 ? 'rotate' : 'normal')
-        : 'normal';
-
-    const newPipe = {
+    let gap = 140;
+    const isTroll = score === 99;
+    if (isTroll) gap = 0;
+    pipes.push({
       x: canvas.width,
       width: 40,
       top: top,
-      gap: 140,
+      gap: gap,
       passed: false,
-      rotate: pipeType === 'rotate',
-      angle: 0,
-      shift: pipeType === 'shift' ? (Math.random() < 0.5 ? -1 : 1) : 0,
-    };
-    pipes.push(newPipe);
-  }
-
-  pipes.forEach(p => {
-    const speed = 2 + Math.min(score / 20, 3);
-    p.x += reverseMode ? speed : -speed;
-    if (p.rotate) p.angle = Math.sin(frames / 20) * 0.1;
-    if (p.shift) p.top += Math.sin(frames / 15) * 0.5 * p.shift;
-  });
-
-  if (pipes.length && pipes[0].x + pipes[0].width < 0) pipes.shift();
-}
-
-function updateFlyers() {
-  if (score >= 40 && frames % 150 === 0) {
-    flyers.push({
-      x: canvas.width + 30,
-      y: Math.random() * (canvas.height - 60) + 30,
-      radius: 15,
-      speed: 6 + score * 0.1
+      troll: isTroll
     });
   }
-  flyers.forEach(f => f.x -= f.speed);
-  flyers = flyers.filter(f => f.x + f.radius > 0);
-}
 
-function drawFlyers() {
-  flyers.forEach(f => {
-    ctx.beginPath();
-    ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#ff4d6d";
-    ctx.fill();
-  });
+  pipes.forEach(p => p.x -= 2);
+  if (pipes.length && pipes[0].x + pipes[0].width < 0) pipes.shift();
 }
 
 function detectCollision() {
@@ -210,11 +157,6 @@ function detectCollision() {
       bird.x + bird.radius > p.x && bird.x - bird.radius < p.x + p.width &&
       (bird.y - bird.radius < p.top || bird.y + bird.radius > p.top + p.gap)
     ) return true;
-  }
-  for (let f of flyers) {
-    const dx = bird.x - f.x;
-    const dy = bird.y - f.y;
-    if (Math.sqrt(dx * dx + dy * dy) < bird.radius + f.radius) return true;
   }
   return false;
 }
@@ -228,18 +170,14 @@ function loop() {
       score++;
       p.passed = true;
       document.getElementById("score").textContent = score;
-      if (score === 99) reverseMode = true;
     }
   });
 
   bird.velocity += gravity;
-  bird.y += reverseMode ? -bird.velocity : bird.velocity;
+  bird.y += bird.velocity;
 
   drawPipes();
   drawBird();
-
-  updateFlyers();
-  drawFlyers();
 
   if (detectCollision()) return endGame();
 
