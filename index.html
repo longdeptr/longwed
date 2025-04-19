@@ -1,136 +1,209 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <title>Math Master</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Math Master Mobile</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       font-family: 'Segoe UI', sans-serif;
-      text-align: center;
-      background: linear-gradient(135deg, #e3f2fd, #ffffff);
-      padding: 30px;
-    }
-    h1 {
-      color: #1565c0;
-      margin-bottom: 10px;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+      transition: background 0.5s ease, color 0.5s ease;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
     }
     #game-container {
-      background: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-      max-width: 400px;
-      margin: auto;
-      padding: 30px;
+      width: 100%;
+      max-width: 500px;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 2em;
+      margin: 20px 0;
+      color: #1565c0;
+    }
+    .mode-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+    button {
+      font-size: 1.1em;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      background: #42a5f5;
+      color: white;
+      margin: 5px;
+      flex: 1;
+      min-width: 90px;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    button:hover {
+      background: #1e88e5;
     }
     .info {
-      font-size: 1.1em;
+      font-size: 1.2em;
       margin: 10px 0;
       color: #333;
     }
     #question {
       font-size: 2em;
-      margin: 20px 0;
+      margin: 15px 0;
       color: #222;
     }
     #inputAnswer {
       font-size: 1.5em;
       padding: 10px;
-      width: 100px;
-      text-align: center;
+      width: 90%;
+      max-width: 300px;
+      margin: 10px auto;
+      display: block;
+    }
+    #submitAnswer {
+      display: block;
+      margin: 0 auto 15px;
+      font-size: 1.2em;
+      padding: 10px 20px;
+      background: #66bb6a;
     }
     #message {
-      height: 24px;
+      min-height: 24px;
       margin: 10px;
       font-weight: bold;
+      color: red;
     }
     #gameOver {
       color: red;
       font-size: 1.3em;
-      margin-top: 20px;
+      margin-top: 10px;
     }
-    button {
-      font-size: 1em;
-      padding: 10px 20px;
-      margin: 10px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      background: #42a5f5;
-      color: white;
-      transition: background 0.3s ease;
+    #scorePopup {
+      position: absolute;
+      font-size: 2em;
+      color: green;
+      animation: floatUp 1s ease-out;
+      pointer-events: none;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
     }
-    button:hover {
-      background: #1e88e5;
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, -50%); }
+      100% { opacity: 0; transform: translate(-50%, -100px); }
     }
-    .mode-buttons {
-      margin-bottom: 10px;
+    /* DARK MODE */
+    body.dark {
+      background: #121212;
+      color: #f0f0f0;
+    }
+    body.dark #question,
+    body.dark .info,
+    body.dark #gameOver {
+      color: #f0f0f0;
+    }
+    body.dark button {
+      background: #333;
+      color: #fff;
+    }
+    body.dark button:hover {
+      background: #555;
     }
   </style>
 </head>
 <body>
   <h1>Math Master</h1>
+  <button onclick="toggleDarkMode()" style="position: absolute; top: 10px; right: 10px;">Chế độ tối</button>
   <div id="game-container">
     <div class="mode-buttons">
-      <button onclick="startGame('classic')">Chơi Thường</button>
-      <button onclick="startGame('practice')">Tập Luyện</button>
+      <button onclick="chooseLevel('easy')">Dễ</button>
+      <button onclick="chooseLevel('medium')">TB</button>
+      <button onclick="chooseLevel('hard')">Khó</button>
     </div>
     <div class="info" id="score">Score: 0</div>
     <div class="info" id="level">Level: 1</div>
-    <div class="info" id="highScore">High Score: 0</div>
     <div class="info" id="timer">Time: 10</div>
-
-    <div id="question">Ấn để bắt đầu</div>
+    <div id="question">Chọn cấp độ để bắt đầu</div>
     <input type="number" id="inputAnswer" disabled />
+    <button id="submitAnswer" onclick="checkAnswer()" style="display:none;">Trả lời</button>
     <div id="message"></div>
     <div id="gameOver"></div>
-    <button onclick="startGame(currentMode)" id="playAgain" style="display:none;">Chơi lại</button>
+    <button onclick="chooseLevel(currentLevel)" id="playAgain" style="display:none;">Chơi lại</button>
   </div>
+
+  <div id="scorePopup" style="display:none;">+1</div>
 
   <audio id="correctSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
   <audio id="wrongSound" src="https://www.soundjay.com/button/beep-10.wav"></audio>
 
   <script>
-    let score = 0;
-    let correctAnswer = 0;
-    let time = 10;
-    let timerInterval;
-    let currentMode = "classic";
-    let highScore = localStorage.getItem("mathHighScore") || 0;
+    let score = 0, correctAnswer = 0, time = 10, timerInterval;
+    let currentLevel = "easy";
+    const input = document.getElementById("inputAnswer");
 
-    document.getElementById("highScore").textContent = "High Score: " + highScore;
+    const backgrounds = {
+      1: "#e3f2fd",
+      2: "#ffe0b2",
+      3: "#dcedc8",
+      4: "#f8bbd0",
+      5: "#fff59d",
+      6: "#c5cae9",
+      7: "#b2dfdb",
+      8: "#f0f4c3",
+      9: "#d7ccc8",
+    };
 
-    function startGame(mode) {
-      currentMode = mode;
-      score = 0;
-      time = 10;
-      document.getElementById("score").textContent = "Score: 0";
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+    }
+
+    function chooseLevel(level) {
+      currentLevel = level;
+      score = 0; time = 10;
+      updateScore(0);
       document.getElementById("level").textContent = "Level: 1";
       document.getElementById("gameOver").textContent = "";
-      document.getElementById("inputAnswer").disabled = false;
-      document.getElementById("inputAnswer").value = "";
-      document.getElementById("inputAnswer").focus();
       document.getElementById("playAgain").style.display = "none";
       document.getElementById("message").textContent = "";
+      input.disabled = false;
+      input.value = "";
+      input.focus();
+      document.getElementById("submitAnswer").style.display = "block";
       nextQuestion();
-      if (mode === "classic") startTimer();
-      else document.getElementById("timer").textContent = "Time: --";
+      startTimer();
+    }
+
+    function updateScore(value) {
+      score = value;
+      document.getElementById("score").textContent = "Score: " + score;
     }
 
     function nextQuestion() {
-      let level = Math.floor(score / 5) + 1;
-      document.getElementById("level").textContent = "Level: " + level;
+      let levelNum = Math.floor(score / 5) + 1;
+      document.getElementById("level").textContent = "Level: " + levelNum;
+      document.body.style.background = document.body.classList.contains("dark") ? "#121212" : (backgrounds[levelNum] || "#ffffff");
 
-      let a = Math.floor(Math.random() * level * 10) + 1;
-      let b = Math.floor(Math.random() * level * 10) + 1;
+      let max = currentLevel === "medium" ? 50 : currentLevel === "hard" ? 100 : 10;
+      let a = Math.floor(Math.random() * max) + 1;
+      let b = Math.floor(Math.random() * max) + 1;
       let ops = ["+", "-", "*"];
-      if (level >= 3) ops.push("/");
+      if (levelNum >= 3) ops.push("/");
 
       let op = ops[Math.floor(Math.random() * ops.length)];
-
       if (op === "/") {
         correctAnswer = a;
-        let result = a * b;
-        document.getElementById("question").textContent = `${result} ÷ ${b} = ?`;
+        document.getElementById("question").textContent = `${a * b} ÷ ${b} = ?`;
       } else {
         correctAnswer = eval(`${a}${op}${b}`);
         document.getElementById("question").textContent = `${a} ${op} ${b} = ?`;
@@ -144,49 +217,49 @@
       timerInterval = setInterval(() => {
         time--;
         document.getElementById("timer").textContent = `Time: ${time}`;
-        if (time <= 0) {
-          gameOver();
-        }
+        if (time <= 0) gameOver();
       }, 1000);
     }
 
     function gameOver() {
       clearInterval(timerInterval);
-      document.getElementById("inputAnswer").disabled = true;
-      document.getElementById("gameOver").textContent = `Game Over! Final Score: ${score}`;
+      input.disabled = true;
+      document.getElementById("gameOver").textContent = `Hết giờ! Điểm: ${score}`;
       document.getElementById("playAgain").style.display = "inline-block";
+      document.getElementById("submitAnswer").style.display = "none";
+    }
 
-      if (score > highScore && currentMode === "classic") {
-        highScore = score;
-        localStorage.setItem("mathHighScore", highScore);
-        document.getElementById("highScore").textContent = "High Score: " + highScore;
+    function checkAnswer() {
+      let userAnswer = Number(input.value);
+      if (userAnswer === correctAnswer) {
+        document.getElementById("correctSound").play();
+        showScorePopup();
+        updateScore(score + 1);
+        time = Math.min(10, time + 2);
+        input.value = "";
+        nextQuestion();
+      } else {
+        document.getElementById("wrongSound").play();
+        document.getElementById("message").textContent = "Sai rồi!";
+        if (navigator.vibrate) navigator.vibrate(200);
+        gameOver();
       }
     }
 
-    document.getElementById("inputAnswer").addEventListener("keyup", function (e) {
-      if (e.key === "Enter") {
-        let userAnswer = Number(this.value);
-        if (userAnswer === correctAnswer) {
-          document.getElementById("correctSound").play();
-          score++;
-          if (currentMode === "classic") {
-            time = Math.min(10, time + 2);
-            document.getElementById("score").textContent = "Score: " + score;
-          } else {
-            document.getElementById("score").textContent = "Correct: " + score;
-          }
-          this.value = "";
-          nextQuestion();
-        } else {
-          document.getElementById("wrongSound").play();
-          if (currentMode === "classic") {
-            document.getElementById("message").textContent = "Sai rồi!";
-            gameOver();
-          } else {
-            document.getElementById("message").textContent = "Sai, thử lại!";
-          }
-        }
-      }
+    function showScorePopup() {
+      const popup = document.getElementById("scorePopup");
+      popup.style.display = "block";
+      setTimeout(() => popup.style.display = "none", 1000);
+    }
+
+    input.addEventListener("keyup", function (e) {
+      if (e.key === "Enter") checkAnswer();
+    });
+
+    input.addEventListener('focus', () => {
+      setTimeout(() => {
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
     });
   </script>
 </body>
