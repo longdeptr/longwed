@@ -1,22 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Memory Trap - Puzzle Mode</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
+      margin: 0;
       font-family: sans-serif;
       text-align: center;
       background: #111;
       color: white;
-      padding-top: 30px;
+      padding: 20px;
+    }
+    h1 {
+      margin-top: 10px;
     }
     .symbols, .choices {
       display: flex;
       justify-content: center;
       gap: 10px;
-      margin: 20px;
+      margin: 15px auto;
       flex-wrap: wrap;
+      max-width: 100%;
     }
     .box {
       width: 60px;
@@ -38,8 +47,8 @@
       visibility: hidden;
     }
     #result {
-      font-size: 24px;
-      margin-top: 15px;
+      font-size: 20px;
+      margin-top: 10px;
     }
     button {
       margin-top: 20px;
@@ -52,8 +61,12 @@
       cursor: pointer;
     }
     #status {
-      font-size: 18px;
+      font-size: 16px;
       margin-top: 10px;
+    }
+    #countdown {
+      margin-top: 10px;
+      font-size: 16px;
     }
   </style>
 </head>
@@ -155,7 +168,6 @@
       }
     }
 
-    // Puzzle mode từ level 10+
     function askPuzzle() {
       const rand = Math.floor(Math.random() * 3);
       const question = document.getElementById("instruction");
@@ -178,7 +190,6 @@
         question.textContent = `Có bao nhiêu ký hiệu "${symbol}" trong dãy?`;
       }
 
-      // Tạo đáp án
       let choices = [];
       if (rand === 2) {
         choices = shuffle([correctAnswer, `${+correctAnswer + 1}`, `${+correctAnswer + 2}`]);
