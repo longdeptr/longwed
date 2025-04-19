@@ -2,35 +2,51 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Flappy Firefly</title>
   <style>
     html, body {
-      margin: 0; padding: 0; overflow: hidden;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
       background: linear-gradient(to bottom, #0d1b2a, #1b263b);
-      font-family: Arial, sans-serif; color: white;
+      font-family: Arial, sans-serif;
+      color: white;
+      height: 100%;
     }
     canvas {
       display: block;
-      background: url('https://cdn.pixabay.com/photo/2015/12/01/20/28/forest-1072828_1280.jpg') center/cover no-repeat;
+      width: 100vw;
+      height: 100vh;
+      background: url('https://i.ibb.co/3kxS3Sk/forest-bg.png') center/cover no-repeat;
     }
     #menu, #gameOverMenu, #countdown, #hud {
-      position: absolute; top: 50%; left: 50%;
+      position: absolute;
+      top: 50%;
+      left: 50%;
       transform: translate(-50%, -50%);
-      text-align: center; z-index: 10;
+      text-align: center;
+      z-index: 10;
     }
     #menu, #gameOverMenu {
       background: rgba(0,0,0,0.6);
-      padding: 20px 30px; border-radius: 15px;
+      padding: 20px 30px;
+      border-radius: 15px;
       backdrop-filter: blur(4px);
     }
     #menu button, #gameOverMenu button {
-      margin-top: 10px; padding: 10px 20px;
-      font-size: 18px; border: none;
-      border-radius: 10px; background: #00b4d8;
-      color: white; cursor: pointer;
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 10px;
+      background: #00b4d8;
+      color: white;
+      cursor: pointer;
     }
     #hud {
-      top: 20px; left: 50%;
+      top: 20px;
+      left: 50%;
       transform: translateX(-50%);
       background: rgba(0,0,0,0.3);
       padding: 10px 20px;
@@ -46,7 +62,7 @@
   </style>
 </head>
 <body>
-<canvas id="gameCanvas" width="400" height="600"></canvas>
+<canvas id="gameCanvas"></canvas>
 
 <div id="menu">
   <h1>Flappy Firefly</h1>
@@ -72,6 +88,13 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
 let gravity = 0.4;
 let lift = -6;
 let bird, pipes, score, highScore = 0, gameOver = false, started = false;
@@ -79,7 +102,7 @@ let chaser = null;
 let frames = 0;
 
 function initVars() {
-  bird = { x: 80, y: 200, radius: 15, velocity: 0 };
+  bird = { x: 80, y: canvas.height / 2, radius: 15, velocity: 0 };
   pipes = [];
   score = 0;
   chaser = null;
@@ -105,19 +128,19 @@ function drawPipes() {
   ctx.fillStyle = "#90e0ef";
   pipes.forEach(p => {
     ctx.save();
-    if (p.type === 'tilt') {
-      ctx.translate(p.x + p.width / 2, p.top / 2);
+    if (p.rotate) {
+      ctx.translate(p.x + p.width/2, p.top/2);
       ctx.rotate(p.angle);
-      ctx.translate(-p.x - p.width / 2, -p.top / 2);
+      ctx.translate(-p.x - p.width/2, -p.top/2);
     }
     ctx.fillRect(p.x, 0, p.width, p.top);
     ctx.restore();
 
     ctx.save();
-    if (p.type === 'tilt') {
-      ctx.translate(p.x + p.width / 2, p.top + p.gap + (canvas.height - (p.top + p.gap)) / 2);
+    if (p.rotate) {
+      ctx.translate(p.x + p.width/2, p.top + p.gap + (canvas.height - (p.top + p.gap))/2);
       ctx.rotate(-p.angle);
-      ctx.translate(-p.x - p.width / 2, -(p.top + p.gap + (canvas.height - (p.top + p.gap)) / 2));
+      ctx.translate(-p.x - p.width/2, -(p.top + p.gap + (canvas.height - (p.top + p.gap))/2));
     }
     ctx.fillRect(p.x, p.top + p.gap, p.width, canvas.height);
     ctx.restore();
@@ -126,32 +149,32 @@ function drawPipes() {
 
 function updatePipes() {
   if (frames % 100 === 0) {
-    const top = Math.random() * 200 + 50;
-    let type = 'normal';
-    if (score >= 50) {
-      type = Math.random() < 0.33 ? 'shift' : Math.random() < 0.5 ? 'tilt' : 'normal';
-    } else if (score >= 20) {
-      type = Math.random() < 0.5 ? 'tilt' : 'normal';
-    }
+    const top = Math.random() * (canvas.height / 3) + 50;
+    const pipeType = score >= 50
+      ? ['normal', 'shift', 'rotate'][Math.floor(Math.random() * 3)]
+      : score >= 20
+        ? (Math.random() < 0.5 ? 'rotate' : 'normal')
+        : 'normal';
 
-    pipes.push({
+    const newPipe = {
       x: canvas.width,
       width: 40,
       top: top,
-      gap: 120,
+      gap: 140,
       passed: false,
-      type: type,
+      rotate: pipeType === 'rotate',
       angle: 0,
-      shift: type === 'shift' ? (Math.random() < 0.5 ? -1 : 1) : 0,
-    });
+      shift: pipeType === 'shift' ? (Math.random() < 0.5 ? -1 : 1) : 0,
+    };
+    pipes.push(newPipe);
   }
 
   pipes.forEach(p => {
     p.x -= 2 + Math.min(score / 20, 3);
-    if (p.type === 'tilt') {
+    if (p.rotate) {
       p.angle = Math.sin(frames / 20) * 0.1;
     }
-    if (p.type === 'shift') {
+    if (p.shift) {
       p.top += Math.sin(frames / 15) * 0.5 * p.shift;
     }
   });
@@ -188,7 +211,6 @@ function updateChaser() {
 
 function loop() {
   if (!started || gameOver) return;
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   updatePipes();
   pipes.forEach(p => {
