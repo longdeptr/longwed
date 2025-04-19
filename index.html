@@ -125,8 +125,23 @@ function drawBird() {
 function drawPipes() {
   ctx.fillStyle = "#90e0ef";
   pipes.forEach(p => {
+    ctx.save();
+    if (p.rotate) {
+      ctx.translate(p.x + p.width/2, p.top/2);
+      ctx.rotate(p.angle);
+      ctx.translate(-p.x - p.width/2, -p.top/2);
+    }
     ctx.fillRect(p.x, 0, p.width, p.top);
+    ctx.restore();
+
+    ctx.save();
+    if (p.rotate) {
+      ctx.translate(p.x + p.width/2, p.top + p.gap + (canvas.height - (p.top + p.gap))/2);
+      ctx.rotate(-p.angle);
+      ctx.translate(-p.x - p.width/2, -(p.top + p.gap + (canvas.height - (p.top + p.gap))/2));
+    }
     ctx.fillRect(p.x, p.top + p.gap, p.width, canvas.height);
+    ctx.restore();
   });
 }
 
@@ -134,19 +149,31 @@ function updatePipes() {
   if (frames % 100 === 0) {
     const top = Math.random() * (canvas.height / 3) + 50;
     let gap = 140;
-    const isTroll = score === 99;
+
+    let isTroll = (score === 99);
     if (isTroll) gap = 0;
-    pipes.push({
+
+    const pipeType = score >= 20 ? (Math.random() < 0.5 ? 'rotate' : 'normal') : 'normal';
+
+    const newPipe = {
       x: canvas.width,
       width: 40,
       top: top,
       gap: gap,
       passed: false,
-      troll: isTroll
-    });
+      rotate: pipeType === 'rotate',
+      angle: 0,
+      shift: 0
+    };
+    pipes.push(newPipe);
   }
 
-  pipes.forEach(p => p.x -= 2);
+  pipes.forEach(p => {
+    const speed = 2 + Math.min(score / 20, 3);
+    p.x -= speed;
+    if (p.rotate) p.angle = Math.sin(frames / 20) * 0.1;
+  });
+
   if (pipes.length && pipes[0].x + pipes[0].width < 0) pipes.shift();
 }
 
