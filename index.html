@@ -2,233 +2,192 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Memory Trap - Puzzle Mode</title>
+  <title>Math Master</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
     body {
-      margin: 0;
-      font-family: sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       text-align: center;
-      background: #111;
-      color: white;
-      padding: 20px;
+      background: linear-gradient(135deg, #e3f2fd, #ffffff);
+      padding: 30px;
     }
     h1 {
-      margin-top: 10px;
+      color: #1565c0;
+      margin-bottom: 10px;
     }
-    .symbols, .choices {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin: 15px auto;
-      flex-wrap: wrap;
-      max-width: 100%;
+    #game-container {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      max-width: 400px;
+      margin: auto;
+      padding: 30px;
     }
-    .box {
-      width: 60px;
-      height: 60px;
-      font-size: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #222;
-      border: 2px solid #555;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: background 0.2s;
+    .info {
+      font-size: 1.1em;
+      margin: 10px 0;
+      color: #333;
     }
-    .box:hover {
-      background: #444;
+    #question {
+      font-size: 2em;
+      margin: 20px 0;
+      color: #222;
     }
-    .hidden {
-      visibility: hidden;
+    #inputAnswer {
+      font-size: 1.5em;
+      padding: 10px;
+      width: 100px;
+      text-align: center;
     }
-    #result {
-      font-size: 20px;
-      margin-top: 10px;
+    #message {
+      height: 24px;
+      margin: 10px;
+      font-weight: bold;
+    }
+    #gameOver {
+      color: red;
+      font-size: 1.3em;
+      margin-top: 20px;
     }
     button {
-      margin-top: 20px;
+      font-size: 1em;
       padding: 10px 20px;
-      font-size: 16px;
+      margin: 10px;
       border: none;
-      background: #28a745;
-      color: white;
       border-radius: 8px;
       cursor: pointer;
+      background: #42a5f5;
+      color: white;
+      transition: background 0.3s ease;
     }
-    #status {
-      font-size: 16px;
-      margin-top: 10px;
+    button:hover {
+      background: #1e88e5;
     }
-    #countdown {
-      margin-top: 10px;
-      font-size: 16px;
+    .mode-buttons {
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Memory Trap</h1>
-  <div id="status">Level: 1 | Điểm: 0</div>
-  <p id="instruction">Ghi nhớ dãy ký hiệu:</p>
-  <div class="symbols" id="sequence"></div>
-  <div id="countdown"></div>
-  <div class="choices" id="choices"></div>
-  <div id="result"></div>
-  <button onclick="startGame()">Chơi lại</button>
+  <h1>Math Master</h1>
+  <div id="game-container">
+    <div class="mode-buttons">
+      <button onclick="startGame('classic')">Chơi Thường</button>
+      <button onclick="startGame('practice')">Tập Luyện</button>
+    </div>
+    <div class="info" id="score">Score: 0</div>
+    <div class="info" id="level">Level: 1</div>
+    <div class="info" id="highScore">High Score: 0</div>
+    <div class="info" id="timer">Time: 10</div>
+
+    <div id="question">Ấn để bắt đầu</div>
+    <input type="number" id="inputAnswer" disabled />
+    <div id="message"></div>
+    <div id="gameOver"></div>
+    <button onclick="startGame(currentMode)" id="playAgain" style="display:none;">Chơi lại</button>
+  </div>
+
+  <audio id="correctSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+  <audio id="wrongSound" src="https://www.soundjay.com/button/beep-10.wav"></audio>
 
   <script>
-    const allSymbols = ['★','☀','☁','☂','☘','❤','✿','♞','♻','✈','⚡','☠','⚙','✉','❄','⚔','⚖','☕','☯','☢'];
-    let level = 1, score = 0;
-    let sequence = [], userInput = [], answer, timeoutID;
+    let score = 0;
+    let correctAnswer = 0;
+    let time = 10;
+    let timerInterval;
+    let currentMode = "classic";
+    let highScore = localStorage.getItem("mathHighScore") || 0;
 
-    function shuffle(arr) {
-      return [...arr].sort(() => Math.random() - 0.5);
+    document.getElementById("highScore").textContent = "High Score: " + highScore;
+
+    function startGame(mode) {
+      currentMode = mode;
+      score = 0;
+      time = 10;
+      document.getElementById("score").textContent = "Score: 0";
+      document.getElementById("level").textContent = "Level: 1";
+      document.getElementById("gameOver").textContent = "";
+      document.getElementById("inputAnswer").disabled = false;
+      document.getElementById("inputAnswer").value = "";
+      document.getElementById("inputAnswer").focus();
+      document.getElementById("playAgain").style.display = "none";
+      document.getElementById("message").textContent = "";
+      nextQuestion();
+      if (mode === "classic") startTimer();
+      else document.getElementById("timer").textContent = "Time: --";
     }
 
-    function startGame() {
-      clearTimeout(timeoutID);
-      userInput = [];
-      answer = null;
-      document.getElementById("result").textContent = "";
-      document.getElementById("choices").innerHTML = "";
-      document.getElementById("sequence").innerHTML = "";
-      document.getElementById("sequence").classList.remove("hidden");
-      document.getElementById("instruction").textContent = "Ghi nhớ dãy ký hiệu:";
-      document.getElementById("status").textContent = `Level: ${level} | Điểm: ${score}`;
+    function nextQuestion() {
+      let level = Math.floor(score / 5) + 1;
+      document.getElementById("level").textContent = "Level: " + level;
 
-      const symbolCount = Math.min(3 + Math.floor(level / 2), 10);
-      sequence = shuffle(allSymbols).slice(0, symbolCount);
+      let a = Math.floor(Math.random() * level * 10) + 1;
+      let b = Math.floor(Math.random() * level * 10) + 1;
+      let ops = ["+", "-", "*"];
+      if (level >= 3) ops.push("/");
 
-      sequence.forEach(sym => {
-        const div = document.createElement("div");
-        div.className = "box";
-        div.textContent = sym;
-        document.getElementById("sequence").appendChild(div);
-      });
+      let op = ops[Math.floor(Math.random() * ops.length)];
 
-      let timeLeft = 3 + Math.floor(symbolCount / 2);
-      document.getElementById("countdown").textContent = `Ghi nhớ trong ${timeLeft} giây...`;
+      if (op === "/") {
+        correctAnswer = a;
+        let result = a * b;
+        document.getElementById("question").textContent = `${result} ÷ ${b} = ?`;
+      } else {
+        correctAnswer = eval(`${a}${op}${b}`);
+        document.getElementById("question").textContent = `${a} ${op} ${b} = ?`;
+      }
 
-      const countdown = setInterval(() => {
-        timeLeft--;
-        document.getElementById("countdown").textContent = `Ghi nhớ trong ${timeLeft} giây...`;
-        if (timeLeft === 0) {
-          clearInterval(countdown);
-          document.getElementById("sequence").classList.add("hidden");
-          if (level < 10) {
-            document.getElementById("countdown").textContent = "Chọn lại đúng thứ tự:";
-            showChoices();
-          } else {
-            askPuzzle();
-          }
+      document.getElementById("message").textContent = "";
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        time--;
+        document.getElementById("timer").textContent = `Time: ${time}`;
+        if (time <= 0) {
+          gameOver();
         }
       }, 1000);
     }
 
-    function showChoices() {
-      const box = document.getElementById("choices");
-      const options = shuffle([...sequence, ...shuffle(allSymbols.filter(s => !sequence.includes(s))).slice(0, level)]);
-      box.innerHTML = "";
+    function gameOver() {
+      clearInterval(timerInterval);
+      document.getElementById("inputAnswer").disabled = true;
+      document.getElementById("gameOver").textContent = `Game Over! Final Score: ${score}`;
+      document.getElementById("playAgain").style.display = "inline-block";
 
-      options.forEach(sym => {
-        const div = document.createElement("div");
-        div.className = "box";
-        div.textContent = sym;
-        div.onclick = () => {
-          if (userInput.length >= sequence.length) return;
-          userInput.push(sym);
-          div.style.opacity = 0.4;
-          checkInput();
-        };
-        box.appendChild(div);
-      });
-
-      timeoutID = setTimeout(() => {
-        document.getElementById("result").textContent = "Hết giờ rồi! Bạn đã thua!";
-        resetProgress();
-      }, 10000);
+      if (score > highScore && currentMode === "classic") {
+        highScore = score;
+        localStorage.setItem("mathHighScore", highScore);
+        document.getElementById("highScore").textContent = "High Score: " + highScore;
+      }
     }
 
-    function checkInput() {
-      if (userInput.length === sequence.length) {
-        clearTimeout(timeoutID);
-        if (userInput.join("") === sequence.join("")) {
-          score += level * 10;
-          level++;
-          document.getElementById("result").textContent = "Đúng rồi! Lên level tiếp!";
-          setTimeout(startGame, 2000);
+    document.getElementById("inputAnswer").addEventListener("keyup", function (e) {
+      if (e.key === "Enter") {
+        let userAnswer = Number(this.value);
+        if (userAnswer === correctAnswer) {
+          document.getElementById("correctSound").play();
+          score++;
+          if (currentMode === "classic") {
+            time = Math.min(10, time + 2);
+            document.getElementById("score").textContent = "Score: " + score;
+          } else {
+            document.getElementById("score").textContent = "Correct: " + score;
+          }
+          this.value = "";
+          nextQuestion();
         } else {
-          document.getElementById("result").textContent = "Sai rồi... Bị bẫy rồi!";
-          resetProgress();
+          document.getElementById("wrongSound").play();
+          if (currentMode === "classic") {
+            document.getElementById("message").textContent = "Sai rồi!";
+            gameOver();
+          } else {
+            document.getElementById("message").textContent = "Sai, thử lại!";
+          }
         }
       }
-    }
-
-    function askPuzzle() {
-      const rand = Math.floor(Math.random() * 3);
-      const question = document.getElementById("instruction");
-      const box = document.getElementById("choices");
-      box.innerHTML = "";
-      let correctAnswer = "";
-
-      if (rand === 0) {
-        const pos = Math.floor(Math.random() * sequence.length);
-        correctAnswer = sequence[pos];
-        question.textContent = `Biểu tượng thứ ${pos + 1} là gì?`;
-      } else if (rand === 1) {
-        const notIn = shuffle(allSymbols.filter(s => !sequence.includes(s)))[0];
-        correctAnswer = notIn;
-        question.textContent = `Biểu tượng nào KHÔNG có trong dãy?`;
-      } else if (rand === 2) {
-        const symbol = sequence[Math.floor(Math.random() * sequence.length)];
-        const count = sequence.filter(s => s === symbol).length;
-        correctAnswer = `${count}`;
-        question.textContent = `Có bao nhiêu ký hiệu "${symbol}" trong dãy?`;
-      }
-
-      let choices = [];
-      if (rand === 2) {
-        choices = shuffle([correctAnswer, `${+correctAnswer + 1}`, `${+correctAnswer + 2}`]);
-      } else {
-        choices = shuffle([correctAnswer, ...shuffle(allSymbols.filter(s => s !== correctAnswer)).slice(0, 3)]);
-      }
-
-      choices.forEach(opt => {
-        const div = document.createElement("div");
-        div.className = "box";
-        div.textContent = opt;
-        div.onclick = () => {
-          if (opt === correctAnswer) {
-            score += level * 15;
-            level++;
-            document.getElementById("result").textContent = "Bạn đã trả lời đúng! Tiếp tục!";
-            setTimeout(startGame, 2000);
-          } else {
-            document.getElementById("result").textContent = "Sai rồi... Đáp án đúng là: " + correctAnswer;
-            resetProgress();
-          }
-        };
-        box.appendChild(div);
-      });
-
-      timeoutID = setTimeout(() => {
-        document.getElementById("result").textContent = "Hết giờ rồi! Bạn đã thua!";
-        resetProgress();
-      }, 10000);
-    }
-
-    function resetProgress() {
-      clearTimeout(timeoutID);
-      level = 1;
-      score = 0;
-      setTimeout(startGame, 3000);
-    }
-
-    startGame();
+    });
   </script>
 </body>
 </html>
