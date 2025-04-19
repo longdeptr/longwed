@@ -18,7 +18,7 @@
       display: block;
       width: 100vw;
       height: 100vh;
-      background: url('https://i.ibb.co/3kxS3Sk/forest-bg.png') center/cover no-repeat;
+      background: #0d1b2a;
     }
     #menu, #gameOverMenu, #countdown, #hud {
       position: absolute;
@@ -98,14 +98,14 @@ resizeCanvas();
 let gravity = 0.4;
 let lift = -6;
 let bird, pipes, score, highScore = 0, gameOver = false, started = false;
-let chaser = null;
 let frames = 0;
+let flyers = [];
 
 function initVars() {
   bird = { x: 80, y: canvas.height / 2, radius: 15, velocity: 0 };
   pipes = [];
   score = 0;
-  chaser = null;
+  flyers = [];
   gameOver = false;
 }
 
@@ -182,6 +182,28 @@ function updatePipes() {
   if (pipes.length && pipes[0].x + pipes[0].width < 0) pipes.shift();
 }
 
+function updateFlyers() {
+  if (score >= 40 && frames % 150 === 0) {
+    flyers.push({
+      x: canvas.width + 30,
+      y: Math.random() * (canvas.height - 60) + 30,
+      radius: 15,
+      speed: 6 + score * 0.1
+    });
+  }
+  flyers.forEach(f => f.x -= f.speed);
+  flyers = flyers.filter(f => f.x + f.radius > 0);
+}
+
+function drawFlyers() {
+  flyers.forEach(f => {
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#ff4d6d";
+    ctx.fill();
+  });
+}
+
 function detectCollision() {
   if (bird.y + bird.radius > canvas.height || bird.y - bird.radius < 0) return true;
   for (let p of pipes) {
@@ -190,23 +212,12 @@ function detectCollision() {
       (bird.y - bird.radius < p.top || bird.y + bird.radius > p.top + p.gap)
     ) return true;
   }
+  for (let f of flyers) {
+    const dx = bird.x - f.x;
+    const dy = bird.y - f.y;
+    if (Math.sqrt(dx * dx + dy * dy) < bird.radius + f.radius) return true;
+  }
   return false;
-}
-
-function drawChaser() {
-  if (!chaser) return;
-  ctx.beginPath();
-  ctx.arc(chaser.x, chaser.y, 10, 0, Math.PI * 2);
-  ctx.fillStyle = "#ff6f61";
-  ctx.fill();
-}
-
-function updateChaser() {
-  if (!chaser) return;
-  const dx = bird.x - chaser.x;
-  const dy = bird.y - chaser.y;
-  chaser.x += dx * 0.02;
-  chaser.y += dy * 0.02;
 }
 
 function loop() {
@@ -227,9 +238,8 @@ function loop() {
   drawPipes();
   drawBird();
 
-  if (score >= 40 && !chaser) chaser = { x: 0, y: 0 };
-  updateChaser();
-  drawChaser();
+  updateFlyers();
+  drawFlyers();
 
   if (detectCollision()) return endGame();
 
